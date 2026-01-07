@@ -1,0 +1,23 @@
+#!/bin/sh
+
+DAEMON=/usr/sbin/tailscaled
+
+case "$1" in
+  start)
+    echo "Starting tailscaled"
+
+    if pidof tailscaled >/dev/null; then
+        echo "tailscaled already running"
+        exit 0
+    fi
+
+    $DAEMON &
+
+    ;;
+  stop)
+    echo "Stopping tailscaled"
+    killall tailscaled 2>/dev/null
+    ;;
+esac
+
+exit 0
