@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+
+    <title>Importar / Exportar - Telemetria</title>
+</head>
+
+<body>
+    <!-- Navbar -->
+    <nav class="navbar bg-body-tertiary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+                <img src="./public/img/lab-service-icon.png" alt="Logo" width="300" height="100">
+            </a>
+        </div>
+    </nav>
+
+    <div class="container mt-5">
+
+        <h1 class="text-center mb-5">Importar / Exportar Configuração</h1>
+
+        <div class="row g-4">
+
+            <!-- EXPORTAR -->
+            <div class="col-12 col-lg-6">
+                <div class="card h-100">
+                    <div class="card-header">
+                        Exportar Configuração
+                    </div>
+
+                    <div class="card-body d-flex flex-column justify-content-between">
+
+                        <p>
+                            Baixe um arquivo <strong>JSON</strong> contendo todas as configurações
+                            de equipamentos, IPs e OIDs SNMP.
+                        </p>
+
+                        <a href="/cgi-bin/export_config.lua" class="btn btn-primary btn-lg w-100">
+                            Baixar Configuração
+                        </a>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- IMPORTAR -->
+            <div class="col-12 col-lg-6">
+                <div class="card h-100">
+                    <div class="card-header">
+                        Importar Configuração
+                    </div>
+
+                    <div class="card-body">
+
+                        <p>
+                            Envie um arquivo <strong>JSON</strong> para importar configurações
+                            de múltiplos equipamentos de uma só vez.
+                        </p>
+
+                        <form method="post" action="/cgi-bin/import_config.lua" enctype="multipart/form-data">
+
+                            <div class="mb-3">
+                                <label class="form-label">Arquivo JSON</label>
+                                <input type="file" class="form-control" name="config_file" accept=".json">
+                            </div>
+
+                            <button type="submit" class="btn btn-success btn-lg w-100">
+                                Importar Configuração
+                            </button>
+
+                        </form>
+
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Aviso -->
+        <div class="alert alert-warning mt-5" role="alert">
+            ⚠️ Importar uma configuração irá <strong>substituir</strong> os dados atuais.
+            Utilize esta função com cuidado.
+        </div>
+
+        <!-- Voltar -->
+        <div class="mt-4 text-center">
+            <a href="index.html" class="btn btn-outline-secondary">
+                Voltar
+            </a>
+        </div>
+
+    </div>
+
+</body>
+
+</html>
