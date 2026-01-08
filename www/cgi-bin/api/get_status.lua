@@ -1,3 +1,4 @@
+#!/usr/bin/lua
 -- adiciona ../lib ao package.path
 package.path = package.path .. ";../lib/?.lua"
 

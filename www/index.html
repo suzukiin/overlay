@@ -26,34 +26,34 @@
 
                 <div>
                     <small class="text-muted">IP VPN</small><br>
-                    <strong>100.64.12.34</strong>
+                    <strong id="status_ip_vpn">100.64.12.34</strong>
                 </div>
 
                 <div>
                     <small class="text-muted">Status VPN</small><br>
-                    <span class="badge text-bg-success">Conectado</span>
+                    <span class="badge text-bg-secondary" id="status_vpn"></span>
                 </div>
 
                 <div>
                     <small class="text-muted">LTE</small><br>
-                    <strong>-75 dBm</strong>
-                    <span class="badge text-bg-success">Bom</span>
+                    <strong id="status_lte_level"></strong>
+                    <span class="badge text-bg-secondary" id="status_lte_status"></span>
                     <!-- warning = Médio | danger = Fraco -->
                 </div>
 
                 <div>
                     <small class="text-muted">Localidade</small><br>
-                    <strong>São Paulo</strong>
+                    <strong id="status_info_local"></strong>
                 </div>
 
                 <div>
                     <small class="text-muted">Cliente</small><br>
-                    <strong>Cliente XYZ</strong>
+                    <strong id="status_info_client"></strong>
                 </div>
 
                 <div>
                     <small class="text-muted">ID</small><br>
-                    <strong>#TLM-001</strong>
+                    <strong id="status_info_id"></strong>
                 </div>
 
             </div>
@@ -97,6 +97,7 @@
             </div>
         </div>
     </div>
+    <script src="public/javascript/index.js"></script>
 </body>
 
 </html>
