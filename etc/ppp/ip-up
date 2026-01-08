@@ -1,0 +1,39 @@
+#!/bin/sh
+
+LOGTAG="ip-up"
+
+log() {
+    echo "<6>[$LOGTAG] $1" > /dev/kmsg
+}
+
+##########################################################
+# DNS
+##########################################################
+
+if [ -f /etc/ppp/resolv.conf ]; then
+    cp /etc/ppp/resolv.conf /etc/resolv.conf
+    log "DNS atualizado"
+fi
+
+##########################################################
+# Hora (NTP)
+##########################################################
+
+if command -v chronyd >/dev/null 2>&1; then
+    if ! pidof chronyd >/dev/null; then
+        log "Sincronizando horário com chrony"
+        chronyd -q
+    fi
+fi
+
+##########################################################
+# Tailscale
+##########################################################
+
+if command -v tailscaled >/dev/null 2>&1; then
+    if ! pidof tailscaled >/dev/null; then
+        log "Iniciando tailscaled"
+        /usr/sbin/tailscaled &
+        sleep 2
+    fi
+fio

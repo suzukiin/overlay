@@ -1,0 +1,145 @@
+#!/bin/sh
+#mount -o  remount,noatime   /
+
+start() {
+    log(){
+        echo "<6>$1" > /dev/kmsg
+    }
+
+    ##########################################################
+    #Logs para o Kernel
+    log "**************************************************"
+    log "Iniciando Script de Inicialização Jupiter"
+
+    ##########################################################
+    #Inicializa os GPIO's do sistema
+    log "**************************************************"
+    log "Inicializando GPIO's DO SISTEMA"
+
+    #Aqui vai a configuração dos GPIO's
+
+    # Fim da configuração dos GPIO's
+    ##########################################################
+
+
+    ##########################################################
+    #Inicialização IP padrão na interface eth0
+    log "**************************************************"
+    log "Configurando IP padrão na interface eth0"
+
+    ifconfig eth0 192.168.1.100 netmask 255.255.255.0
+    
+    #Adicionando IPs adicionais para leituras SNMP
+    /etc/network/eth0.cfg
+    
+    #Fim da configuração do IP padrão
+    ##########################################################
+
+
+    ##########################################################
+    #Inicializa tabela NAT
+    log "**************************************************"
+    log "Inicializando Tabela NAT"
+
+    echo 1 > /proc/sys/net/ipv4/ip_forward
+
+    # Fim da inicialização da tabela NAT
+    ##########################################################
+
+
+    ##########################################################
+    #Inicialização HTTPD
+    log "**************************************************"
+    log "Iniciando Servidor HTTPD"
+
+    httpd -p 80 -h /www
+
+    # Fim da inicialização do HTTPD
+    ##########################################################
+
+
+    ##########################################################
+    #Inicializa serviço LTE
+    log "**************************************************"
+    log "Iniciando Serviço LTE"
+
+    PEER="VIVO-PEERS"
+    PPP_IF="ppp0"
+    MODEM_DEV="/dev/ttyUSB2"
+
+    wait_for_modem() {
+        log "[ppp] aguardando modem $MODEM_DEV..."
+        for i in $(seq 1 60); do
+            [ -e "$MODEM_DEV" ] && return 0
+            sleep 1
+        done
+        return 1
+    }
+
+    wait_for_ppp() {
+        log "[ppp] aguardando interface ppp0..."
+        for i in $(seq 1 60); do
+            ip addr show ppp0 2>/dev/null | grep -q "inet " && return 0
+            sleep 1
+        done
+        return 1
+    }
+
+    log "[ppp] iniciando PPP..."
+
+    wait_for_modem || {
+        log "[ppp] modem não encontrado"
+        return 1
+    }
+
+    pidof pppd >/dev/null && {
+        log "[ppp] pppd já está rodando"
+        return 0
+    }
+
+    pppd call "$PEER" &
+    wait_for_ppp || {
+        log "[ppp] ppp0 não subiu"
+        return 1
+    }
+
+    # Fim da inicialização do serviço LTE
+    ##########################################################
+}
+stop() {
+    ##########################################################
+    #Finaliza os GPIO's do sistema
+    log "**************************************************"
+    log "Finalizando GPIO's DO SISTEMA"
+
+    # Fim da finalização dos GPIO's
+    ##########################################################
+
+    ##########################################################
+    #Finalização IP padrão na interface eth0
+    log "**************************************************"
+    log "Removendo IP padrão na interface eth0"
+
+    ifconfig eth0 down
+    log ""
+    #Fim da finalização do IP padrão
+    ##########################################################
+}
+restart() {
+    stop
+    start
+}
+case "$1" in
+  start)
+        start
+        ;;
+  stop)
+        stop
+        ;;
+  restart|reload)
+        restart
+        ;;
+  *)
+        echo "Usage: $0 {start|stop|restart}"
+        exit 1
+esac
