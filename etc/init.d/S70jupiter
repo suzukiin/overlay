@@ -30,7 +30,15 @@ start() {
     ifconfig eth0 192.168.1.100 netmask 255.255.255.0
     
     #Adicionando IPs adicionais para leituras SNMP
-    /etc/network/eth0.cfg
+    
+    CFG="/etc/network/eth0.cfg"
+
+    if [ -f "$CFG" ]; then
+        while read ip; do
+            [ -z "$ip" ] && continue
+            ip addr add "$ip" dev eth0 2>/dev/null
+        done < "$CFG"
+    fi
     
     #Fim da configuração do IP padrão
     ##########################################################

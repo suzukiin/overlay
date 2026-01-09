@@ -75,19 +75,7 @@
                     </div>
 
                     <div class="card-body">
-                        <ul class="list-group">
-                            <!-- Exemplo estático -->
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                192.168.1.10
-                                <span class="badge text-bg-success">Ativo</span>
-                            </li>
-
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                192.168.1.20
-                                <span class="badge text-bg-success">Ativo</span>
-                            </li>
-
-                            <!-- Depois você pode gerar isso dinamicamente -->
+                        <ul class="list-group" id="eth0_ips">
                         </ul>
                     </div>
                 </div>
@@ -101,12 +89,12 @@
                     </div>
 
                     <div class="card-body">
-                        <form method="post" action="/cgi-bin/add_ip.lua">
+                        <form id="form_add_ip">
 
                             <div class="mb-3">
                                 <label for="ip" class="form-label">Endereço IP</label>
                                 <input type="text" class="form-control" id="ip" name="ip"
-                                    placeholder="Ex: 192.168.1.100">
+                                    placeholder="Ex: 192.168.57.100/24">
                             </div>
 
                             <button type="submit" class="btn btn-primary w-100">
@@ -128,7 +116,7 @@
         </div>
 
     </div>
-    <script src="public/javascript/configuracao.js"></script>
+    <script src="./public/javascript/configuracao.js"></script>
 </body>
 
 </html>

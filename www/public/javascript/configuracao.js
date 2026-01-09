@@ -35,6 +35,67 @@ async function loadStatus() {
     }
 }
 
+async function getEth0IPs() {
+    try {
+        const res = await fetch('/cgi-bin/api/get_eth0_ips.lua');
+        const data = await res.json();
+
+        const list_ips = document.getElementById('eth0_ips');
+        list_ips.innerHTML = '';
+
+        data.eth0_ips.forEach(ip => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item d-flex justify-content-between align-items-center';
+
+            const ipText = document.createTextNode(ip);
+
+            const badge = document.createElement('span');
+            badge.className = 'badge text-bg-success';
+            badge.innerText = 'Ativo';
+
+            li.appendChild(ipText);
+            li.appendChild(badge);
+
+            list_ips.appendChild(li);
+        });
+    } catch (err) {
+        console.error('Erro ao obter IPs eth0:', err);
+    }
+}
+
+getEth0IPs();
 loadStatus();
 
+document.getElementById('form_add_ip').addEventListener('submit', function (e) {
+    e.preventDefault();
+    addEth0Ip();
+});
+
+async function addEth0Ip() {
+    try {
+        const ip = document.getElementById('ip').value.trim();
+        if (!ip) {
+            alert('Informe um IP');
+            return;
+        }
+
+        const res = await fetch(`/cgi-bin/api/add_ip.lua?ip=${encodeURIComponent(ip)}`);
+        const data = await res.json();
+
+        if (data.success) {
+            document.getElementById('ip').value = '';
+            getEth0IPs();
+        } else {
+            alert(`Erro ao adicionar IP: ${data.error}`);
+        }
+    } catch (err) {
+        console.error('Erro ao adicionar IP:', err);
+    }
+}
+
+
 setInterval(loadStatus, 60000);
+setInterval(getEth0IPs, 30000);
+
+
+
