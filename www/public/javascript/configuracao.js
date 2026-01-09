@@ -47,24 +47,39 @@ async function getEth0IPs() {
             const li = document.createElement('li');
             li.className = 'list-group-item d-flex justify-content-between align-items-center';
 
-            const ipText = document.createTextNode(ip);
+            // Lado esquerdo: IP
+            const ipText = document.createElement('span');
+            ipText.innerText = ip;
+
+            // Lado direito: badge + botão
+            const actions = document.createElement('div');
 
             const badge = document.createElement('span');
-            badge.className = 'badge text-bg-success';
+            badge.className = 'badge text-bg-success me-2';
             badge.innerText = 'Ativo';
 
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-sm btn-outline-danger';
+            btn.innerText = 'Excluir';
+
+            // Evento de clique
+            btn.addEventListener('click', () => {
+                removeEth0Ip(ip);
+            });
+
+            actions.appendChild(badge);
+            actions.appendChild(btn);
+
             li.appendChild(ipText);
-            li.appendChild(badge);
+            li.appendChild(actions);
 
             list_ips.appendChild(li);
         });
+
     } catch (err) {
         console.error('Erro ao obter IPs eth0:', err);
     }
 }
-
-getEth0IPs();
-loadStatus();
 
 document.getElementById('form_add_ip').addEventListener('submit', function (e) {
     e.preventDefault();
@@ -93,7 +108,27 @@ async function addEth0Ip() {
     }
 }
 
+async function removeEth0Ip(ip) {
+    if (!confirm(`Deseja remover o IP ${ip}?`)) {
+        return;
+    }
 
+    try {
+        const res = await fetch(`/cgi-bin/api/remove_ip.lua?ip=${encodeURIComponent(ip)}`);
+        const data = await res.json();
+
+        if (data.success) {
+            getEth0IPs();
+        } else {
+            alert(`Erro ao remover IP: ${data.error}`);
+        }
+    } catch (err) {
+        console.error('Erro ao remover IP:', err);
+    }
+}
+
+getEth0IPs();
+loadStatus();
 setInterval(loadStatus, 60000);
 setInterval(getEth0IPs, 30000);
 

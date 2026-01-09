@@ -44,18 +44,30 @@ end
 
 function M.remove_eth0_ip(ip)
     local ips = M.get_cfg_eth0()
+    local found = false
+
     local f = io.open(CFG, "w")
-    if not f then return false end
+    if not f then
+        return false, "Não foi possível abrir cfg"
+    end
 
     for _, v in ipairs(ips) do
         if v ~= ip then
             f:write(v .. "\n")
+        else
+            found = true
         end
     end
 
     f:close()
+
+    if not found then
+        return false, "IP não encontrado"
+    end
+
     os.execute("ip addr del " .. ip .. " dev eth0 2>/dev/null")
     return true
 end
+
 
 return M
