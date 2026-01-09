@@ -110,8 +110,19 @@ start() {
         log "[ppp] ppp0 não subiu"
         return 1
     }
-
+ 
     # Fim da inicialização do serviço LTE
+    ##########################################################
+
+
+    ##########################################################
+    #Inicializa Watchdog na interface ppp
+    log "**************************************************"
+
+    log "Iniciando watchdog PPP"
+    nohup /usr/sbin/ppp-watchdog.sh >/dev/null 2>&1 &
+
+    #Fim da inicializacao Interface ppp
     ##########################################################
 }
 stop() {
