@@ -203,6 +203,104 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
+    async function fetchAds1015() {
+        try {
+            const response = await fetch("/cgi-bin/get-ads1015");
+            const res = await response.json();
+
+            if (res.status == "Success" && res.data.channels) {
+                res.data.channels.forEach(channel => {
+                    const ch = channel.channel;
+                    const voltage = parseFloat(channel.voltage);
+                    const adsVoltage = parseFloat(channel.ads_voltage);
+                    const raw = channel.raw;
+                    const kernelScale = channel.kernel_scale;
+                    const gain = channel.gain;
+                    const offset = channel.offset;
+
+                    const voltageElement = document.getElementById(`ads-ch${ch}-voltage`);
+                    const rawElement = document.getElementById(`ads-ch${ch}-raw`);
+                    const statusElement = document.getElementById(`ads-ch${ch}-status`);
+                    const gainElement = document.getElementById(`ads-ch${ch}-gain`);
+                    const offsetElement = document.getElementById(`ads-ch${ch}-offset`);
+
+                    if (voltageElement && rawElement && statusElement && gainElement && offsetElement) {
+                        voltageElement.textContent = `Entrada: ${voltage.toFixed(3)} V`;
+                        rawElement.textContent = `ADS: ${adsVoltage.toFixed(3)} V | raw: ${raw} | k: ${kernelScale}`;
+                        statusElement.textContent = "OK";
+                        statusElement.className = "text-success font-mono";
+
+                        if (document.activeElement !== gainElement) {
+                            gainElement.value = gain;
+                        }
+                        if (document.activeElement !== offsetElement) {
+                            offsetElement.value = offset;
+                        }
+                    }
+                });
+            } else {
+                // ADS1015 não disponível, mostrar erro em todos os canais
+                for (let i = 0; i < 4; i++) {
+                    const statusElement = document.getElementById(`ads-ch${i}-status`);
+                    if (statusElement) {
+                        statusElement.textContent = "ERRO";
+                        statusElement.className = "text-danger font-mono";
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("Erro ao buscar ADS1015:", error);
+            for (let i = 0; i < 4; i++) {
+                const statusElement = document.getElementById(`ads-ch${i}-status`);
+                if (statusElement) {
+                    statusElement.textContent = "ERRO";
+                    statusElement.className = "text-danger font-mono";
+                }
+            }
+        }
+    }
+
+    async function setAdsCalibration(channel) {
+        const gainElement = document.getElementById(`ads-ch${channel}-gain`);
+        const offsetElement = document.getElementById(`ads-ch${channel}-offset`);
+        const statusElement = document.getElementById(`ads-ch${channel}-status`);
+        const gain = gainElement ? gainElement.value.trim() : "";
+        const offset = offsetElement ? offsetElement.value.trim() : "0";
+
+        if (!/^[0-9]+(\.[0-9]+)?$/.test(gain)) {
+            window.alert("Ganho inválido. Para o divisor 68k/33k use inicialmente 3.060606.");
+            return;
+        }
+
+        if (!/^-?[0-9]+(\.[0-9]+)?$/.test(offset)) {
+            window.alert("Offset inválido. Use número em volts, exemplo: 0 ou -0.015");
+            return;
+        }
+
+        try {
+            if (statusElement) {
+                statusElement.textContent = "SALVANDO";
+                statusElement.className = "text-warning font-mono";
+            }
+
+            const response = await fetch(`/cgi-bin/get-ads1015?channel=${channel}&gain=${encodeURIComponent(gain)}&offset=${encodeURIComponent(offset)}`, {
+                method: "POST"
+            });
+            const res = await response.json();
+
+            if (res.status === "Success") {
+                fetchAds1015();
+            } else {
+                window.alert("Erro ao salvar scale: " + (res.msg || "--"));
+                fetchAds1015();
+            }
+        } catch (error) {
+            console.error("Erro ao salvar calibração do ADS1015:", error);
+            window.alert("Erro ao salvar calibração");
+            fetchAds1015();
+        }
+    }
+
     async function fetchStatusVpn() {
 
         const response = await fetch("/cgi-bin/get-status-vpn");
@@ -286,6 +384,10 @@ document.addEventListener("DOMContentLoaded", function () {
     fetchCpuTemperature();
     fetchTelemetry();
     fetchRssi();
+    fetchAds1015();
+
+    window.fetchLogs = fetchLogs;
+    window.setAdsCalibration = setAdsCalibration;
 
     // Relay Control Functions
     async function fetchRelays() {
@@ -344,6 +446,435 @@ document.addEventListener("DOMContentLoaded", function () {
     // Load initial relay state and update periodically
     fetchRelays();
     setInterval(fetchRelays, 5000);
+    setInterval(fetchAds1015, 5000);
+
+    // ============ RELAY SCHEDULER FUNCTIONS ============
+    
+    let scheduleData = {
+        schema_version: 1,
+        enabled: true,
+        timezone: "local",
+        rules: []
+    };
+
+    const dayLabels = {
+        mon: "Seg",
+        tue: "Ter",
+        wed: "Qua",
+        thu: "Qui",
+        fri: "Sex",
+        sat: "Sab",
+        sun: "Dom"
+    };
+
+    function normalizeScheduleData(data) {
+        return {
+            schema_version: Number(data?.schema_version) || 1,
+            enabled: Boolean(data?.enabled),
+            timezone: data?.timezone || "local",
+            rules: Array.isArray(data?.rules) ? data.rules : []
+        };
+    }
+
+    function setScheduleSaveStatus(text, tone = "secondary") {
+        const element = document.getElementById("schedule-save-status");
+        if (!element) return;
+
+        element.textContent = text;
+        element.className = `badge bg-dark border border-${tone} text-${tone} font-mono`;
+    }
+
+    function updateSchedulerHeader() {
+        const enabledToggle = document.getElementById("scheduler-enabled");
+        const badge = document.getElementById("scheduler-status-badge");
+        const summary = document.getElementById("scheduler-summary");
+        const enabled = Boolean(scheduleData.enabled);
+        const totalRules = scheduleData.rules.length;
+        const activeRules = scheduleData.rules.filter(rule => rule.enabled).length;
+
+        if (enabledToggle) {
+            enabledToggle.checked = enabled;
+        }
+
+        if (badge) {
+            badge.textContent = enabled ? "ON" : "OFF";
+            badge.className = enabled
+                ? "badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 font-mono"
+                : "badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 font-mono";
+        }
+
+        if (summary) {
+            summary.textContent = `${totalRules} regras configuradas | ${activeRules} ativas | timezone: ${scheduleData.timezone || "local"}`;
+        }
+    }
+
+    function formatRuleDays(days) {
+        if (!Array.isArray(days) || days.length === 0) {
+            return "--";
+        }
+
+        return days.map(day => dayLabels[day] || day).join(", ");
+    }
+
+    async function fetchScheduleConfig() {
+        try {
+            setScheduleSaveStatus("carregando", "secondary");
+            const response = await fetch("/cgi-bin/relay-schedule");
+            const res = await response.json();
+
+            if (res.status == "Success" && res.data) {
+                scheduleData = normalizeScheduleData(res.data);
+                renderScheduleRules();
+                setScheduleSaveStatus("sincronizado", "success");
+            } else {
+                console.error("Error fetching schedule:", res.msg);
+                renderScheduleRules(); // Show empty
+                setScheduleSaveStatus("erro", "danger");
+            }
+        } catch (error) {
+            console.error("Error fetching schedule config:", error);
+            renderScheduleRules();
+            setScheduleSaveStatus("erro", "danger");
+        }
+    }
+
+    function renderScheduleRules() {
+        const container = document.getElementById("schedule-rules-container");
+        updateSchedulerHeader();
+
+        if (!scheduleData.rules || scheduleData.rules.length === 0) {
+            container.innerHTML = `
+                <div class="scheduler-empty">
+                    <i class="bi bi-calendar2-x text-secondary fs-4"></i>
+                    <span>Nenhuma regra configurada</span>
+                </div>
+            `;
+            return;
+        }
+
+        let html = `
+            <div class="table-responsive">
+                <table class="table table-custom scheduler-table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Regra</th>
+                            <th>Relé</th>
+                            <th>Ação</th>
+                            <th>Horário</th>
+                            <th>Dias</th>
+                            <th>Status</th>
+                            <th class="text-end">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        scheduleData.rules.forEach((rule, index) => {
+            const daysStr = formatRuleDays(rule.days);
+            const stateLabel = Number(rule.state) === 1 ? "Ligar" : "Desligar";
+            const stateClass = Number(rule.state) === 1 ? "success" : "danger";
+            const enabledClass = rule.enabled ? "success" : "secondary";
+            const enabledText = rule.enabled ? "Ativa" : "Pausada";
+            
+            html += `
+                        <tr>
+                            <td>
+                                <div class="font-mono text-light scheduler-rule-id">${rule.id || "--"}</div>
+                            </td>
+                            <td><span class="badge bg-dark border border-secondary text-secondary font-mono">Relé ${rule.relay}</span></td>
+                            <td><span class="badge bg-${stateClass} bg-opacity-10 text-${stateClass} border border-${stateClass} border-opacity-25">${stateLabel}</span></td>
+                            <td class="font-mono text-light">${rule.time || "--"}</td>
+                            <td class="text-muted">${daysStr}</td>
+                            <td>
+                                <div class="form-check form-switch scheduler-row-switch">
+                                    <input class="form-check-input schedule-rule-toggle" type="checkbox"
+                                        id="rule-enabled-${index}" data-index="${index}"
+                                        ${rule.enabled ? "checked" : ""}>
+                                    <label class="form-check-label small text-${enabledClass}" for="rule-enabled-${index}">
+                                        ${enabledText}
+                                    </label>
+                                </div>
+                            </td>
+                            <td class="text-end scheduler-row-actions">
+                                <button class="btn btn-sm btn-outline-warning" type="button"
+                                    data-action="edit-rule" data-index="${index}" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" type="button"
+                                    data-action="remove-rule" data-index="${index}" title="Remover">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+            `;
+        });
+        
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+        container.innerHTML = html;
+
+        container.querySelectorAll(".schedule-rule-toggle").forEach(toggle => {
+            toggle.addEventListener("change", () => toggleRuleEnabled(toggle));
+        });
+
+        container.querySelectorAll("[data-action='edit-rule']").forEach(button => {
+            button.addEventListener("click", () => editScheduleRule(Number(button.dataset.index)));
+        });
+
+        container.querySelectorAll("[data-action='remove-rule']").forEach(button => {
+            button.addEventListener("click", () => removeScheduleRule(Number(button.dataset.index)));
+        });
+    }
+
+    function toggleRuleEnabled(checkbox) {
+        const index = parseInt(checkbox.getAttribute("data-index"));
+        if (scheduleData.rules[index]) {
+            scheduleData.rules[index].enabled = checkbox.checked;
+            saveScheduleConfig();
+        }
+    }
+
+    window.toggleRuleEnabled = toggleRuleEnabled;
+
+    function removeScheduleRule(index) {
+        if (confirm("Deseja remover esta regra?")) {
+            scheduleData.rules.splice(index, 1);
+            saveScheduleConfig();
+        }
+    }
+
+    window.removeScheduleRule = removeScheduleRule;
+
+    function editScheduleRule(index) {
+        const rule = scheduleData.rules[index];
+        showScheduleRuleModal(rule, index);
+    }
+
+    window.editScheduleRule = editScheduleRule;
+
+    function addScheduleRule() {
+        if (!Array.isArray(scheduleData.rules)) {
+            scheduleData.rules = [];
+        }
+
+        const newRule = {
+            id: "rule_" + Date.now(),
+            enabled: true,
+            relay: 1,
+            state: 1,
+            time: "08:00",
+            days: ["mon", "tue", "wed", "thu", "fri"]
+        };
+        showScheduleRuleModal(newRule, -1);
+    }
+
+    window.addScheduleRule = addScheduleRule;
+
+    function showScheduleRuleModal(rule, index) {
+        // Create a modal dialog for editing the rule
+        const isNew = index === -1;
+        const title = isNew ? "Adicionar Regra" : "Editar Regra";
+        
+        const daysOptions = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+            .map(day => {
+                const checked = rule.days && rule.days.includes(day) ? "checked" : "";
+                return `
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input day-checkbox" type="checkbox" value="${day}" 
+                            id="day-${day}" ${checked}>
+                        <label class="form-check-label" for="day-${day}">${dayLabels[day]}</label>
+                    </div>
+                `;
+            }).join("");
+
+        const modal = `
+            <div class="modal fade" id="ruleModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content bg-dark border border-secondary border-opacity-25">
+                        <div class="modal-header border-secondary border-opacity-25">
+                            <h5 class="modal-title">${title}</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label for="ruleId" class="form-label text-light small text-uppercase">ID da Regra</label>
+                                <input type="text" class="form-control bg-dark border-secondary text-light font-mono" 
+                                    id="ruleId" value="${rule.id}" ${isNew ? '' : 'readonly'}>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="ruleRelay" class="form-label text-light small text-uppercase">Relé</label>
+                                <select class="form-select bg-dark border-secondary text-light" id="ruleRelay">
+                                    <option value="1" ${rule.relay == 1 ? 'selected' : ''}>Relé 1</option>
+                                    <option value="2" ${rule.relay == 2 ? 'selected' : ''}>Relé 2</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="ruleState" class="form-label text-light small text-uppercase">Estado</label>
+                                <select class="form-select bg-dark border-secondary text-light" id="ruleState">
+                                    <option value="1" ${rule.state == 1 ? 'selected' : ''}>Ligar (ON)</option>
+                                    <option value="0" ${rule.state == 0 ? 'selected' : ''}>Desligar (OFF)</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="ruleTime" class="form-label text-light small text-uppercase">Horário (HH:MM)</label>
+                                <input type="time" class="form-control bg-dark border-secondary text-light" 
+                                    id="ruleTime" value="${rule.time}">
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label text-light small text-uppercase d-block mb-2">Dias da Semana</label>
+                                <div class="schedule-days-grid">
+                                    ${daysOptions}
+                                </div>
+                            </div>
+
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="ruleEnabled" 
+                                    ${rule.enabled ? 'checked' : ''}>
+                                <label class="form-check-label text-muted small" for="ruleEnabled">
+                                    Regra ativa
+                                </label>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-secondary border-opacity-25">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-jupiter" onclick="saveScheduleRule(${index})">Salvar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Remove old modal if exists
+        const oldModal = document.getElementById("ruleModal");
+        if (oldModal) {
+            oldModal.remove();
+        }
+
+        // Add new modal
+        document.body.insertAdjacentHTML("beforeend", modal);
+
+        // Show modal
+        const ruleModal = new bootstrap.Modal(document.getElementById("ruleModal"));
+        ruleModal.show();
+    }
+
+    function saveScheduleRule(index) {
+        // Get form values
+        const id = document.getElementById("ruleId").value.trim();
+        const relay = parseInt(document.getElementById("ruleRelay").value);
+        const state = parseInt(document.getElementById("ruleState").value);
+        const time = document.getElementById("ruleTime").value;
+        const enabled = document.getElementById("ruleEnabled").checked;
+
+        // Get selected days
+        const days = Array.from(document.querySelectorAll(".day-checkbox:checked"))
+            .map(cb => cb.value);
+
+        // Validate
+        if (!id || id.trim() === "") {
+            alert("ID da regra é obrigatório");
+            return;
+        }
+
+        if (!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(time)) {
+            alert("Horário inválido (use HH:MM)");
+            return;
+        }
+
+        if (days.length === 0) {
+            alert("Selecione pelo menos um dia");
+            return;
+        }
+
+        // Check for duplicate IDs (if new rule or if ID changed)
+        const isNew = index === -1;
+        const isDuplicateId = scheduleData.rules.some((r, i) => 
+            r.id === id && (isNew || i !== index)
+        );
+
+        if (isDuplicateId) {
+            alert("ID da regra já existe");
+            return;
+        }
+
+        // Create or update rule
+        const newRule = { id, enabled, relay, state, time, days };
+
+        if (isNew) {
+            scheduleData.rules.push(newRule);
+        } else {
+            scheduleData.rules[index] = newRule;
+        }
+
+        // Close modal and save
+        bootstrap.Modal.getInstance(document.getElementById("ruleModal")).hide();
+        setTimeout(() => {
+            document.getElementById("ruleModal").remove();
+            saveScheduleConfig();
+        }, 300);
+    }
+
+    window.saveScheduleRule = saveScheduleRule;
+
+    function updateSchedulerState() {
+        scheduleData.enabled = document.getElementById("scheduler-enabled").checked;
+        saveScheduleConfig();
+    }
+
+    window.updateSchedulerState = updateSchedulerState;
+
+    async function saveScheduleConfig() {
+        try {
+            scheduleData = normalizeScheduleData(scheduleData);
+            setScheduleSaveStatus("salvando", "warning");
+            const response = await fetch("/cgi-bin/relay-schedule", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(scheduleData)
+            });
+
+            const res = await response.json();
+
+            if (res.status == "Success") {
+                console.log("Schedule config saved");
+                renderScheduleRules();
+                setScheduleSaveStatus("salvo", "success");
+            } else {
+                setScheduleSaveStatus("erro", "danger");
+                alert("Erro ao salvar configuração: " + res.msg);
+            }
+        } catch (error) {
+            console.error("Error saving schedule config:", error);
+            setScheduleSaveStatus("erro", "danger");
+            alert("Erro ao salvar configuração");
+        }
+    }
+
+    const schedulerEnabled = document.getElementById("scheduler-enabled");
+    const scheduleAddBtn = document.getElementById("schedule-add-btn");
+    const scheduleRefreshBtn = document.getElementById("schedule-refresh-btn");
+
+    if (schedulerEnabled) {
+        schedulerEnabled.addEventListener("change", updateSchedulerState);
+    }
+    if (scheduleAddBtn) {
+        scheduleAddBtn.addEventListener("click", addScheduleRule);
+    }
+    if (scheduleRefreshBtn) {
+        scheduleRefreshBtn.addEventListener("click", fetchScheduleConfig);
+    }
+
+    // Load schedule on startup
+    fetchScheduleConfig();
 
     setInterval(fetchUptime, 60000);
     setInterval(fetchCpuTemperature, 10000);

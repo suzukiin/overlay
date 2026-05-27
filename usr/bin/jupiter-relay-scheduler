@@ -1,0 +1,292 @@
+#!/bin/sh
+
+. /usr/bin/jupiter-common
+
+SCHEDULE_CONFIG="/etc/jupiter/relay_schedule.json"
+STATE_FILE="/var/lib/jupiter/state/relay_schedule_state"
+RELAY_STATE_FILE="/var/lib/jupiter/state/relay_state"
+LEGACY_RELAY_STATE_FILE="/etc/jupiter/relay_state"
+
+log_scheduler() {
+    jupiter_log relay-scheduler "$*"
+}
+
+ensure_files() {
+    jupiter_mkdirs
+    [ -f "$STATE_FILE" ] || : > "$STATE_FILE"
+}
+
+current_day() {
+    case "$(date +%u)" in
+        1) echo mon ;;
+        2) echo tue ;;
+        3) echo wed ;;
+        4) echo thu ;;
+        5) echo fri ;;
+        6) echo sat ;;
+        7) echo sun ;;
+    esac
+}
+
+json_value() {
+    local object="$1"
+    local key="$2"
+
+    echo "$object" | sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -n 1
+}
+
+json_number_or_bool() {
+    local object="$1"
+    local key="$2"
+
+    echo "$object" | sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\\([^,}]*\\).*/\1/p" \
+        | tr -d ' "' | head -n 1
+}
+
+config_enabled() {
+    local enabled
+
+    enabled="$(tr '\n' ' ' < "$SCHEDULE_CONFIG" \
+        | sed 's/"enabled"/\
+"enabled"/g' \
+        | sed -n 's/.*"enabled"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' \
+        | head -n 1)"
+    [ "$enabled" = "true" ]
+}
+
+config_enabled_text() {
+    if config_enabled; then
+        echo true
+    else
+        echo false
+    fi
+}
+
+emit_rules() {
+    tr '\n' ' ' < "$SCHEDULE_CONFIG" \
+        | sed 's/[[:space:]]\+/ /g' \
+        | sed 's/},[[:space:]]*{/}\n{/g' \
+        | grep '"id"'
+}
+
+rule_has_day() {
+    local rule="$1"
+    local day="$2"
+
+    echo "$rule" | grep -q "\"$day\""
+}
+
+already_executed() {
+    local rule_id="$1"
+    local stamp="$2"
+
+    grep -q "^$rule_id $stamp$" "$STATE_FILE" 2>/dev/null
+}
+
+record_execution() {
+    local rule_id="$1"
+    local stamp="$2"
+    local tmp="$STATE_FILE.tmp"
+
+    grep -v "^$rule_id " "$STATE_FILE" > "$tmp" 2>/dev/null || true
+    mv "$tmp" "$STATE_FILE"
+    echo "$rule_id $stamp" >> "$STATE_FILE"
+}
+
+persist_relay_state() {
+    local relay="$1"
+    local state="$2"
+    local relay1=0
+    local relay2=0
+
+    if [ -f "$RELAY_STATE_FILE" ]; then
+        read relay1 relay2 < "$RELAY_STATE_FILE"
+    elif [ -f "$LEGACY_RELAY_STATE_FILE" ]; then
+        read relay1 relay2 < "$LEGACY_RELAY_STATE_FILE"
+    fi
+
+    case "$relay1" in 0|1) ;; *) relay1=0 ;; esac
+    case "$relay2" in 0|1) ;; *) relay2=0 ;; esac
+
+    if [ "$relay" = "1" ]; then
+        relay1="$state"
+    else
+        relay2="$state"
+    fi
+
+    echo "$relay1 $relay2" > "$RELAY_STATE_FILE"
+    echo "$relay1 $relay2" > "$LEGACY_RELAY_STATE_FILE"
+}
+
+apply_rule() {
+    local rule_id="$1"
+    local relay="$2"
+    local state="$3"
+
+    case "$relay" in 1|2) ;; *) log_scheduler "invalid relay rule=$rule_id relay=$relay"; return 1 ;; esac
+    case "$state" in 0|1) ;; *) log_scheduler "invalid state rule=$rule_id state=$state"; return 1 ;; esac
+
+    if [ ! -e "/dev/relay$relay" ]; then
+        log_scheduler "relay device missing rule=$rule_id relay=$relay path=/dev/relay$relay"
+        return 1
+    fi
+
+    if echo "$state" > "/dev/relay$relay"; then
+        persist_relay_state "$relay" "$state"
+        log_scheduler "applied rule=$rule_id relay=$relay state=$state"
+        return 0
+    fi
+
+    log_scheduler "failed to write relay rule=$rule_id relay=$relay state=$state"
+    return 1
+}
+
+process_once() {
+    local now_date
+    local now_time
+    local now_day
+    local stamp
+    local rule
+    local rule_id
+    local enabled
+    local relay
+    local state
+    local rule_time
+
+    [ -f "$SCHEDULE_CONFIG" ] || return 0
+    config_enabled || return 0
+
+    now_date="$(date +%Y-%m-%d)"
+    now_time="$(date +%H:%M)"
+    now_day="$(current_day)"
+    stamp="$now_date $now_time"
+
+    emit_rules | while IFS= read -r rule; do
+        rule_id="$(json_value "$rule" id)"
+        enabled="$(json_number_or_bool "$rule" enabled)"
+        relay="$(json_number_or_bool "$rule" relay)"
+        state="$(json_number_or_bool "$rule" state)"
+        rule_time="$(json_value "$rule" time)"
+
+        [ -n "$rule_id" ] || continue
+        [ "$enabled" = "true" ] || continue
+        [ "$rule_time" = "$now_time" ] || continue
+        rule_has_day "$rule" "$now_day" || continue
+        already_executed "$rule_id" "$stamp" && continue
+
+        if apply_rule "$rule_id" "$relay" "$state"; then
+            record_execution "$rule_id" "$stamp"
+        fi
+    done
+}
+
+print_status() {
+    ensure_files
+
+    echo "config=$SCHEDULE_CONFIG"
+    echo "config_exists=$([ -f "$SCHEDULE_CONFIG" ] && echo true || echo false)"
+    echo "enabled=$(config_enabled_text)"
+    echo "date=$(date '+%Y-%m-%d %H:%M:%S %z')"
+    echo "scheduler_day=$(current_day)"
+    echo "scheduler_time=$(date +%H:%M)"
+    echo "state_file=$STATE_FILE"
+    echo "relay1=$([ -e /dev/relay1 ] && cat /dev/relay1 2>/dev/null || echo missing)"
+    echo "relay2=$([ -e /dev/relay2 ] && cat /dev/relay2 2>/dev/null || echo missing)"
+}
+
+list_rules() {
+    local now_time
+    local now_day
+    local now_date
+    local stamp
+    local rule
+    local rule_id
+    local enabled
+    local relay
+    local state
+    local rule_time
+    local due
+    local already
+
+    ensure_files
+    now_time="$(date +%H:%M)"
+    now_day="$(current_day)"
+    now_date="$(date +%Y-%m-%d)"
+    stamp="$now_date $now_time"
+
+    emit_rules | while IFS= read -r rule; do
+        rule_id="$(json_value "$rule" id)"
+        enabled="$(json_number_or_bool "$rule" enabled)"
+        relay="$(json_number_or_bool "$rule" relay)"
+        state="$(json_number_or_bool "$rule" state)"
+        rule_time="$(json_value "$rule" time)"
+        due=false
+        already=false
+
+        if [ "$enabled" = "true" ] && [ "$rule_time" = "$now_time" ] && rule_has_day "$rule" "$now_day"; then
+            due=true
+        fi
+        if already_executed "$rule_id" "$stamp"; then
+            already=true
+        fi
+
+        echo "id=$rule_id enabled=$enabled relay=$relay state=$state time=$rule_time day_match=$(rule_has_day "$rule" "$now_day" && echo true || echo false) due_now=$due already_this_minute=$already"
+    done
+}
+
+force_rule() {
+    local wanted_id="$1"
+    local rule
+    local rule_id
+    local relay
+    local state
+
+    [ -n "$wanted_id" ] || {
+        echo "Usage: $0 force RULE_ID" >&2
+        return 1
+    }
+
+    emit_rules | while IFS= read -r rule; do
+        rule_id="$(json_value "$rule" id)"
+        [ "$rule_id" = "$wanted_id" ] || continue
+
+        relay="$(json_number_or_bool "$rule" relay)"
+        state="$(json_number_or_bool "$rule" state)"
+        apply_rule "$rule_id" "$relay" "$state"
+        exit $?
+    done
+}
+
+run_loop() {
+    ensure_files
+    log_scheduler "started"
+
+    while true; do
+        process_once
+        sleep 30
+    done
+}
+
+ensure_files
+
+case "$1" in
+    ""|run)
+        run_loop
+        ;;
+    once)
+        process_once
+        ;;
+    status)
+        print_status
+        ;;
+    list)
+        list_rules
+        ;;
+    force)
+        force_rule "$2"
+        ;;
+    *)
+        echo "Usage: $0 [run|once|status|list|force RULE_ID]" >&2
+        exit 1
+        ;;
+esac

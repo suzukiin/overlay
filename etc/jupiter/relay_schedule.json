@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "enabled": true,
+  "timezone": "local",
+  "rules": [
+    {
+      "id": "relay1_on_morning",
+      "enabled": true,
+      "relay": 1,
+      "state": 1,
+      "time": "08:00",
+      "days": ["mon", "tue", "wed", "thu", "fri"]
+    },
+    {
+      "id": "relay1_off_evening",
+      "enabled": true,
+      "relay": 1,
+      "state": 0,
+      "time": "18:00",
+      "days": ["mon", "tue", "wed", "thu", "fri"]
+    }
+  ]
+}

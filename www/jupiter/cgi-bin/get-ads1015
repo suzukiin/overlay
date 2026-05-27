@@ -1,0 +1,169 @@
+#!/bin/sh
+
+. /usr/bin/jupiter-common
+
+ADS_DIR="/var/lib/jupiter/iio/ads1015"
+CALIBRATION_STATE="$JUPITER_STATE/ads1015_calibration"
+DEFAULT_GAIN="3.060606"
+DEFAULT_OFFSET="0"
+
+json_response() {
+    printf "Content-Type: application/json\r\n\r\n"
+    printf "%s\n" "$1"
+}
+
+get_param() {
+    local name="$1"
+
+    echo "${QUERY_STRING:-}" | tr '&' '\n' | sed -n "s/^$name=//p" | head -n 1
+}
+
+valid_channel() {
+    case "$1" in
+        0|1|2|3) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+valid_number() {
+    echo "$1" | grep -Eq '^-?[0-9]+([.][0-9]+)?$'
+}
+
+kernel_scale_file() {
+    local channel="$1"
+
+    if [ -f "$ADS_DIR/in_voltage${channel}_scale" ]; then
+        echo "$ADS_DIR/in_voltage${channel}_scale"
+    elif [ -f "$ADS_DIR/in_voltage_scale" ]; then
+        echo "$ADS_DIR/in_voltage_scale"
+    fi
+}
+
+read_calibration() {
+    local channel="$1"
+    local line
+
+    if [ -f "$CALIBRATION_STATE" ]; then
+        line="$(awk -v ch="$channel" '$1 == ch { print $0; found=1 } END { exit(found ? 0 : 1) }' "$CALIBRATION_STATE" 2>/dev/null)"
+        if [ -n "$line" ]; then
+            echo "$line" | awk '{ print $2, $3 }'
+            return 0
+        fi
+    fi
+
+    echo "$DEFAULT_GAIN $DEFAULT_OFFSET"
+}
+
+write_calibration() {
+    local channel="$1"
+    local gain="$2"
+    local offset="$3"
+    local tmp="$CALIBRATION_STATE.tmp"
+
+    jupiter_mkdirs
+    if [ -f "$CALIBRATION_STATE" ]; then
+        awk -v ch="$channel" '$1 != ch { print }' "$CALIBRATION_STATE" > "$tmp"
+    else
+        : > "$tmp"
+    fi
+
+    echo "$channel $gain $offset" >> "$tmp"
+    mv "$tmp" "$CALIBRATION_STATE"
+}
+
+read_channel() {
+    local channel="$1"
+    local raw_file="$ADS_DIR/in_voltage${channel}_raw"
+    local scale_file
+    local raw
+    local kernel_scale="1"
+    local gain
+    local offset
+    local ads_voltage
+    local input_voltage
+
+    [ -f "$raw_file" ] || return 1
+    raw="$(cat "$raw_file" 2>/dev/null)" || return 1
+
+    scale_file="$(kernel_scale_file "$channel")"
+    if [ -n "$scale_file" ] && [ -f "$scale_file" ]; then
+        kernel_scale="$(cat "$scale_file" 2>/dev/null)"
+        valid_number "$kernel_scale" || kernel_scale="1"
+    fi
+
+    read gain offset <<EOF
+$(read_calibration "$channel")
+EOF
+    valid_number "$gain" || gain="$DEFAULT_GAIN"
+    valid_number "$offset" || offset="$DEFAULT_OFFSET"
+
+    ads_voltage="$(awk -v raw="$raw" -v scale="$kernel_scale" 'BEGIN { printf "%.6f", raw * scale }')"
+    input_voltage="$(awk -v ads="$ads_voltage" -v gain="$gain" -v offset="$offset" 'BEGIN { printf "%.6f", (ads * gain) + offset }')"
+
+    printf '{"channel":%s,"raw":%s,"kernel_scale":%s,"ads_voltage":%s,"gain":%s,"offset":%s,"voltage":%s,"unit":"V"}' \
+        "$channel" "$raw" "$kernel_scale" "$ads_voltage" "$gain" "$offset" "$input_voltage"
+}
+
+handle_get() {
+    local channels=""
+    local channel_json
+    local channel
+
+    for channel in 0 1 2 3; do
+        channel_json="$(read_channel "$channel")" || {
+            json_response '{"status":"Error","msg":"ADS1015 not available"}'
+            return 1
+        }
+
+        if [ -z "$channels" ]; then
+            channels="$channel_json"
+        else
+            channels="$channels,$channel_json"
+        fi
+    done
+
+    json_response "{\"status\":\"Success\",\"data\":{\"channels\":[$channels]}}"
+}
+
+handle_post() {
+    local channel
+    local gain
+    local offset
+
+    channel="$(get_param channel)"
+    gain="$(get_param gain)"
+    offset="$(get_param offset)"
+    [ -n "$offset" ] || offset="$DEFAULT_OFFSET"
+
+    valid_channel "$channel" || {
+        json_response '{"status":"Error","msg":"Invalid channel"}'
+        return 1
+    }
+
+    valid_number "$gain" || {
+        json_response '{"status":"Error","msg":"Invalid gain"}'
+        return 1
+    }
+
+    valid_number "$offset" || {
+        json_response '{"status":"Error","msg":"Invalid offset"}'
+        return 1
+    }
+
+    write_calibration "$channel" "$gain" "$offset"
+    jupiter_log ads1015 "calibration updated channel=$channel gain=$gain offset=$offset"
+
+    handle_get
+}
+
+case "$REQUEST_METHOD" in
+    GET|"")
+        handle_get
+        ;;
+    POST)
+        handle_post
+        ;;
+    *)
+        json_response '{"status":"Error","msg":"Method not allowed"}'
+        ;;
+esac

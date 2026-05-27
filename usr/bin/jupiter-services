@@ -2,6 +2,33 @@
 
 . /usr/bin/jupiter-common
 
+SCHEDULER_PID="$JUPITER_RUN/relay-scheduler.pid"
+
+start_scheduler() {
+    jupiter_mkdirs
+
+    if [ -f "$SCHEDULER_PID" ] && kill -0 "$(cat "$SCHEDULER_PID")" 2>/dev/null; then
+        jupiter_log relay-scheduler "already running"
+        return 0
+    fi
+
+    /usr/bin/jupiter-relay-scheduler &
+    echo "$!" > "$SCHEDULER_PID"
+    jupiter_log relay-scheduler "started pid=$(cat "$SCHEDULER_PID")"
+}
+
+stop_scheduler() {
+    if [ -f "$SCHEDULER_PID" ] && kill -0 "$(cat "$SCHEDULER_PID")" 2>/dev/null; then
+        kill "$(cat "$SCHEDULER_PID")"
+        rm -f "$SCHEDULER_PID"
+        jupiter_log relay-scheduler "stopped"
+        return 0
+    fi
+
+    rm -f "$SCHEDULER_PID"
+    jupiter_log relay-scheduler "not running"
+}
+
 start_services() {
     jupiter_mkdirs
 
@@ -13,12 +40,14 @@ start_services() {
     jupiter_start_once httpd httpd -p 80 -h /www/jupiter
     jupiter_start_once watchdog /usr/bin/jupiter-watchdog
     jupiter_start_once monitor /usr/bin/jupiter-monitor /etc/jupiter/mqtt.json
+    start_scheduler
 }
 
 stop_services() {
     jupiter_stop httpd
     jupiter_stop monitor
     jupiter_stop watchdog
+    stop_scheduler
 }
 
 case "$1" in

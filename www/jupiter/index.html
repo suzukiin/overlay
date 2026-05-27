@@ -202,6 +202,101 @@
                             </div>
                         </div>
                     </div>
+
+                    <div class="col-md-6 col-lg-3">
+                        <div class="dash-card">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="text-muted text-uppercase small mb-0">Entradas Analógicas</h6>
+                                <i class="bi bi-speedometer text-jupiter"></i>
+                            </div>
+
+                            <div class="ads1015-channels">
+                                <div class="ads-channel mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <small class="text-muted">AIN0</small>
+                                        <small class="text-success font-mono" id="ads-ch0-status">--</small>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-light font-mono" id="ads-ch0-voltage">Entrada: 0.000 V</small>
+                                        <small class="text-muted font-mono small" id="ads-ch0-raw">ADS: --</small>
+                                    </div>
+                                    <div class="adc-cal-row mt-2">
+                                        <input class="form-control form-control-sm bg-dark border-secondary text-light font-mono adc-scale-input"
+                                            id="ads-ch0-gain" data-channel="0" inputmode="decimal" placeholder="ganho">
+                                        <input class="form-control form-control-sm bg-dark border-secondary text-light font-mono adc-scale-input"
+                                            id="ads-ch0-offset" data-channel="0" inputmode="decimal" placeholder="offset">
+                                        <button class="btn btn-sm btn-outline-secondary" type="button"
+                                            onclick="setAdsCalibration(0)" title="Aplicar calibração AIN0">
+                                            <i class="bi bi-check2"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="ads-channel mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <small class="text-muted">AIN1</small>
+                                        <small class="text-success font-mono" id="ads-ch1-status">--</small>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-light font-mono" id="ads-ch1-voltage">Entrada: 0.000 V</small>
+                                        <small class="text-muted font-mono small" id="ads-ch1-raw">ADS: --</small>
+                                    </div>
+                                    <div class="adc-cal-row mt-2">
+                                        <input class="form-control form-control-sm bg-dark border-secondary text-light font-mono adc-scale-input"
+                                            id="ads-ch1-gain" data-channel="1" inputmode="decimal" placeholder="ganho">
+                                        <input class="form-control form-control-sm bg-dark border-secondary text-light font-mono adc-scale-input"
+                                            id="ads-ch1-offset" data-channel="1" inputmode="decimal" placeholder="offset">
+                                        <button class="btn btn-sm btn-outline-secondary" type="button"
+                                            onclick="setAdsCalibration(1)" title="Aplicar calibração AIN1">
+                                            <i class="bi bi-check2"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="ads-channel mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <small class="text-muted">AIN2</small>
+                                        <small class="text-success font-mono" id="ads-ch2-status">--</small>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-light font-mono" id="ads-ch2-voltage">Entrada: 0.000 V</small>
+                                        <small class="text-muted font-mono small" id="ads-ch2-raw">ADS: --</small>
+                                    </div>
+                                    <div class="adc-cal-row mt-2">
+                                        <input class="form-control form-control-sm bg-dark border-secondary text-light font-mono adc-scale-input"
+                                            id="ads-ch2-gain" data-channel="2" inputmode="decimal" placeholder="ganho">
+                                        <input class="form-control form-control-sm bg-dark border-secondary text-light font-mono adc-scale-input"
+                                            id="ads-ch2-offset" data-channel="2" inputmode="decimal" placeholder="offset">
+                                        <button class="btn btn-sm btn-outline-secondary" type="button"
+                                            onclick="setAdsCalibration(2)" title="Aplicar calibração AIN2">
+                                            <i class="bi bi-check2"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="ads-channel">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <small class="text-muted">AIN3</small>
+                                        <small class="text-success font-mono" id="ads-ch3-status">--</small>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-light font-mono" id="ads-ch3-voltage">Entrada: 0.000 V</small>
+                                        <small class="text-muted font-mono small" id="ads-ch3-raw">ADS: --</small>
+                                    </div>
+                                    <div class="adc-cal-row mt-2">
+                                        <input class="form-control form-control-sm bg-dark border-secondary text-light font-mono adc-scale-input"
+                                            id="ads-ch3-gain" data-channel="3" inputmode="decimal" placeholder="ganho">
+                                        <input class="form-control form-control-sm bg-dark border-secondary text-light font-mono adc-scale-input"
+                                            id="ads-ch3-offset" data-channel="3" inputmode="decimal" placeholder="offset">
+                                        <button class="btn btn-sm btn-outline-secondary" type="button"
+                                            onclick="setAdsCalibration(3)" title="Aplicar calibração AIN3">
+                                            <i class="bi bi-check2"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -216,6 +311,48 @@
                         Aguardando dados dos sensores...
                     </div>
                 </div>
+
+                <section class="mb-5">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4 class="h5 text-light mb-0 d-flex align-items-center">
+                            <i class="bi bi-clock-history me-2 text-secondary"></i> Gerenciador de Tarefas
+                        </h4>
+                        <span class="badge bg-dark border border-secondary text-secondary font-mono" id="schedule-save-status">--</span>
+                    </div>
+
+                    <div class="scheduler-panel">
+                        <div class="scheduler-toolbar">
+                            <div>
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <span class="scheduler-title">Agendamento dos Relés</span>
+                                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 font-mono"
+                                        id="scheduler-status-badge">OFF</span>
+                                </div>
+                                <div class="text-muted small font-mono" id="scheduler-summary">0 regras configuradas</div>
+                            </div>
+
+                            <div class="scheduler-actions">
+                                <div class="form-check form-switch scheduler-enable">
+                                    <input class="form-check-input" type="checkbox" id="scheduler-enabled">
+                                    <label class="form-check-label small text-muted" for="scheduler-enabled">Ativo</label>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-secondary font-mono" id="schedule-refresh-btn">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>Atualizar
+                                </button>
+                                <button type="button" class="btn btn-sm btn-jupiter font-mono" id="schedule-add-btn">
+                                    <i class="bi bi-plus-lg me-1"></i>Nova Regra
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="schedule-rules-container" class="scheduler-table-wrap">
+                            <div class="text-center text-muted py-4">
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                Carregando regras...
+                            </div>
+                        </div>
+                    </div>
+                </section>
 
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h4 class="h5 text-light mb-0 d-flex align-items-center">

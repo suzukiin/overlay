@@ -1,0 +1,118 @@
+#!/bin/sh
+
+. /usr/bin/jupiter-common
+
+SCHEDULE_CONFIG="/etc/jupiter/relay_schedule.json"
+TMP_CONFIG="/tmp/relay_schedule.$$"
+
+json_response() {
+    printf "Content-Type: application/json\r\n\r\n"
+    printf "%s\n" "$1"
+}
+
+log_cgi() {
+    jupiter_log relay-schedule "$*"
+}
+
+validate_time_values() {
+    local invalid
+
+    invalid="$(grep -o '"time"[[:space:]]*:[[:space:]]*"[^"]*"' "$TMP_CONFIG" \
+        | sed 's/.*"time"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' \
+        | grep -vE '^([01][0-9]|2[0-3]):[0-5][0-9]$' || true)"
+    [ -z "$invalid" ]
+}
+
+validate_days() {
+    local invalid
+
+    invalid="$(grep -o '"\(mon\|tue\|wed\|thu\|fri\|sat\|sun\|[a-z][a-z][a-z]\)"' "$TMP_CONFIG" \
+        | tr -d '"' \
+        | grep -vE '^(mon|tue|wed|thu|fri|sat|sun)$' || true)"
+    [ -z "$invalid" ]
+}
+
+validate_config() {
+    grep -q '"schema_version"' "$TMP_CONFIG" || return 1
+    grep -q '"enabled"[[:space:]]*:' "$TMP_CONFIG" || return 1
+    grep -q '"rules"[[:space:]]*:' "$TMP_CONFIG" || return 1
+    validate_time_values || return 1
+    validate_days || return 1
+
+    if grep -q '"relay"[[:space:]]*:[[:space:]]*[^12]' "$TMP_CONFIG"; then
+        return 1
+    fi
+
+    if grep -q '"state"[[:space:]]*:[[:space:]]*[^01]' "$TMP_CONFIG"; then
+        return 1
+    fi
+
+    return 0
+}
+
+handle_get() {
+    if [ ! -f "$SCHEDULE_CONFIG" ]; then
+        json_response '{"status":"Success","data":{"schema_version":1,"enabled":false,"timezone":"local","rules":[]}}'
+        return 0
+    fi
+
+    json_response "{\"status\":\"Success\",\"data\":$(cat "$SCHEDULE_CONFIG")}"
+}
+
+handle_post() {
+    local content_length="${CONTENT_LENGTH:-0}"
+
+    case "$content_length" in
+        ""|*[!0-9]*)
+            json_response '{"status":"Error","msg":"Invalid CONTENT_LENGTH"}'
+            return 1
+            ;;
+    esac
+
+    if [ "$content_length" -le 0 ]; then
+        json_response '{"status":"Error","msg":"Empty request body"}'
+        return 1
+    fi
+
+    if [ "$content_length" -gt 65536 ]; then
+        json_response '{"status":"Error","msg":"Request too large"}'
+        return 1
+    fi
+
+    head -c "$content_length" > "$TMP_CONFIG"
+
+    if ! validate_config; then
+        rm -f "$TMP_CONFIG"
+        json_response '{"status":"Error","msg":"Invalid schedule config"}'
+        return 1
+    fi
+
+    if [ -f "$SCHEDULE_CONFIG" ]; then
+        cp "$SCHEDULE_CONFIG" "$SCHEDULE_CONFIG.bak"
+    fi
+
+    if mv "$TMP_CONFIG" "$SCHEDULE_CONFIG"; then
+        log_cgi "schedule config updated"
+        json_response '{"status":"Success","msg":"Schedule updated"}'
+        return 0
+    fi
+
+    rm -f "$TMP_CONFIG"
+    if [ -f "$SCHEDULE_CONFIG.bak" ]; then
+        mv "$SCHEDULE_CONFIG.bak" "$SCHEDULE_CONFIG"
+    fi
+    json_response '{"status":"Error","msg":"Failed to save config"}'
+    return 1
+}
+
+case "$REQUEST_METHOD" in
+    GET|"")
+        handle_get
+        ;;
+    POST)
+        handle_post
+        ;;
+    *)
+        json_response '{"status":"Error","msg":"Method not allowed"}'
+        ;;
+esac
