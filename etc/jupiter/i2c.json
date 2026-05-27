@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "bus": "i2c-1",
+  "devices": {
+    "ads1015": {
+      "driver": "ads1015",
+      "address": "0x48",
+      "sysfs_device": "1-0048",
+      "channels": [0, 1, 2, 3]
+    },
+    "eeprom": {
+      "driver": "24c04",
+      "address": "0x50",
+      "aliases": ["0x50", "0x51"],
+      "sysfs_device": "1-0050",
+      "path": "/sys/bus/i2c/devices/1-0050/eeprom",
+      "size_bytes": 512
+    }
+  }
+}

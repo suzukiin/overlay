@@ -6,6 +6,7 @@ This directory is the canonical configuration root for the device image.
 - `fleet.json`: tenant, site and rollout channel metadata.
 - `hardware.json`: GPIO, relay and analog input mapping.
 - `network.json`: LAN, LTE, VPN and NAT intent.
+- `i2c.json`: I2C bus devices registered during boot.
 - `telemetry.json`: telemetry polling and local state file locations.
 - `mqtt.json`: compatibility configuration consumed by the current monitor binary.
 - `secrets.env`: generated during provisioning; must not be committed with production secrets.

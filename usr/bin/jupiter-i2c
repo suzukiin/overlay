@@ -1,0 +1,251 @@
+#!/bin/sh
+
+. /usr/bin/jupiter-common
+
+I2C_BUS_DIR="/sys/bus/i2c/devices/i2c-1"
+ADS_DEVICE_DIR="/sys/bus/i2c/devices/1-0048"
+EEPROM_DEVICE_DIR="/sys/bus/i2c/devices/1-0050"
+EEPROM_PATH="$EEPROM_DEVICE_DIR/eeprom"
+
+log_i2c() {
+    jupiter_log i2c "$*"
+}
+
+fail() {
+    log_i2c "ERROR: $*"
+    echo "ERROR: $*" >&2
+    exit 1
+}
+
+ensure_i2c_bus() {
+    [ -d "$I2C_BUS_DIR" ] || fail "i2c-1 bus not found at $I2C_BUS_DIR"
+    log_i2c "found i2c bus $I2C_BUS_DIR"
+}
+
+register_ads1015() {
+    ensure_i2c_bus
+
+    if [ -d "$ADS_DEVICE_DIR" ]; then
+        log_i2c "ADS1015 already registered at $ADS_DEVICE_DIR"
+        return 0
+    fi
+
+    if echo ads1015 0x48 > "$I2C_BUS_DIR/new_device"; then
+        log_i2c "registered ADS1015 at 0x48"
+    else
+        fail "failed to register ADS1015 at 0x48"
+    fi
+}
+
+register_eeprom() {
+    ensure_i2c_bus
+
+    if [ -f "$EEPROM_PATH" ]; then
+        log_i2c "EEPROM already available at $EEPROM_PATH"
+        return 0
+    fi
+
+    if echo 24c04 0x50 > "$I2C_BUS_DIR/new_device"; then
+        log_i2c "registered EEPROM 24C04 at 0x50"
+    else
+        fail "failed to register EEPROM 24C04 at 0x50"
+    fi
+
+    [ -f "$EEPROM_PATH" ] || fail "EEPROM registered but $EEPROM_PATH is missing"
+}
+
+find_ads_iio() {
+    local dev
+    local name
+
+    for dev in /sys/bus/iio/devices/iio:device*; do
+        [ -f "$dev/name" ] || continue
+        name="$(cat "$dev/name" 2>/dev/null)"
+        case "$name" in
+            *ads1015*)
+                echo "$dev"
+                return 0
+                ;;
+        esac
+    done
+
+    return 1
+}
+
+ads_read_channel() {
+    local channel="$1"
+    local iio_dir
+    local raw_file
+    local scale_file
+    local raw
+    local scale
+    local voltage
+
+    case "$channel" in
+        0|1|2|3) ;;
+        *) fail "invalid ADS1015 channel '$channel'; expected 0..3" ;;
+    esac
+
+    iio_dir="$(find_ads_iio)" || fail "ADS1015 IIO device not found"
+    raw_file="$iio_dir/in_voltage${channel}_raw"
+    scale_file="$iio_dir/in_voltage${channel}_scale"
+
+    [ -f "$raw_file" ] || fail "missing ADS1015 raw file $raw_file"
+
+    raw="$(cat "$raw_file" 2>/dev/null)" || fail "failed to read $raw_file"
+    if [ -f "$scale_file" ]; then
+        scale="$(cat "$scale_file" 2>/dev/null)" || fail "failed to read $scale_file"
+    elif [ -f "$iio_dir/in_voltage_scale" ]; then
+        scale="$(cat "$iio_dir/in_voltage_scale" 2>/dev/null)" || fail "failed to read $iio_dir/in_voltage_scale"
+    else
+        scale="1"
+    fi
+
+    voltage="$(awk -v raw="$raw" -v scale="$scale" 'BEGIN { printf "%.6f", raw * scale }')"
+    printf '{"channel":%s,"raw":%s,"scale":%s,"voltage":%s,"iio_device":"%s"}\n' \
+        "$channel" "$raw" "$scale" "$voltage" "$iio_dir"
+}
+
+ads_read_all() {
+    ads_read_channel 0
+    ads_read_channel 1
+    ads_read_channel 2
+    ads_read_channel 3
+}
+
+eeprom_require() {
+    [ -f "$EEPROM_PATH" ] || fail "EEPROM not available at $EEPROM_PATH"
+}
+
+validate_uint() {
+    local name="$1"
+    local value="$2"
+
+    case "$value" in
+        ""|*[!0-9]*)
+            fail "$name must be an unsigned integer"
+            ;;
+    esac
+}
+
+eeprom_read() {
+    local offset="$1"
+    local length="$2"
+    local output="$3"
+
+    validate_uint offset "$offset"
+    validate_uint length "$length"
+    eeprom_require
+
+    if [ -n "$output" ]; then
+        dd if="$EEPROM_PATH" of="$output" bs=1 skip="$offset" count="$length" 2>/dev/null \
+            || fail "failed to read EEPROM offset=$offset length=$length"
+        log_i2c "read EEPROM offset=$offset length=$length output=$output"
+    else
+        dd if="$EEPROM_PATH" bs=1 skip="$offset" count="$length" 2>/dev/null \
+            || fail "failed to read EEPROM offset=$offset length=$length"
+        log_i2c "read EEPROM offset=$offset length=$length to stdout"
+    fi
+}
+
+eeprom_write() {
+    local offset="$1"
+    local input="$2"
+    local size
+    local current="/tmp/jupiter-eeprom-current.$$"
+
+    validate_uint offset "$offset"
+    [ -f "$input" ] || fail "input file not found: $input"
+    eeprom_require
+
+    size="$(wc -c < "$input" | tr -d ' ')"
+    validate_uint input_size "$size"
+
+    dd if="$EEPROM_PATH" of="$current" bs=1 skip="$offset" count="$size" 2>/dev/null \
+        || fail "failed to read EEPROM before write"
+
+    if cmp -s "$current" "$input"; then
+        rm -f "$current"
+        log_i2c "skipped EEPROM write offset=$offset length=$size; data already matches"
+        return 0
+    fi
+
+    rm -f "$current"
+
+    dd if="$input" of="$EEPROM_PATH" bs=1 seek="$offset" conv=notrunc 2>/dev/null \
+        || fail "failed to write EEPROM offset=$offset length=$size"
+
+    log_i2c "wrote EEPROM offset=$offset length=$size"
+}
+
+init_i2c() {
+    local channel
+
+    jupiter_mkdirs
+    register_ads1015
+    register_eeprom
+
+    if ads_iio="$(find_ads_iio)"; then
+        log_i2c "ADS1015 IIO device found at $ads_iio"
+        echo "$ads_iio" > "$JUPITER_STATE/ads1015_iio_path"
+        mkdir -p /var/lib/jupiter/iio/ads1015
+        ln -sf "$ads_iio/name" /var/lib/jupiter/iio/ads1015/name
+        for channel in 0 1 2 3; do
+            if [ -f "$ads_iio/in_voltage${channel}_raw" ]; then
+                ln -sf "$ads_iio/in_voltage${channel}_raw" \
+                    "/var/lib/jupiter/iio/ads1015/in_voltage${channel}_raw"
+            fi
+            if [ -f "$ads_iio/in_voltage${channel}_scale" ]; then
+                ln -sf "$ads_iio/in_voltage${channel}_scale" \
+                    "/var/lib/jupiter/iio/ads1015/in_voltage${channel}_scale"
+            fi
+        done
+        if [ -f "$ads_iio/in_voltage_scale" ]; then
+            ln -sf "$ads_iio/in_voltage_scale" /var/lib/jupiter/iio/ads1015/in_voltage_scale
+        fi
+    else
+        fail "ADS1015 registered but IIO device was not found"
+    fi
+
+    log_i2c "initialized ADS1015 and EEPROM on i2c-1"
+}
+
+usage() {
+    cat <<EOF
+Usage:
+  $0 init
+  $0 ads-path
+  $0 ads-read CHANNEL
+  $0 ads-read-all
+  $0 eeprom-read OFFSET LENGTH [OUTPUT_FILE]
+  $0 eeprom-write OFFSET INPUT_FILE
+EOF
+    exit 1
+}
+
+case "$1" in
+    init)
+        init_i2c
+        ;;
+    ads-path)
+        find_ads_iio || fail "ADS1015 IIO device not found"
+        ;;
+    ads-read)
+        [ -n "$2" ] || usage
+        ads_read_channel "$2"
+        ;;
+    ads-read-all)
+        ads_read_all
+        ;;
+    eeprom-read)
+        [ -n "$2" ] && [ -n "$3" ] || usage
+        eeprom_read "$2" "$3" "$4"
+        ;;
+    eeprom-write)
+        [ -n "$2" ] && [ -n "$3" ] || usage
+        eeprom_write "$2" "$3"
+        ;;
+    *)
+        usage
+        ;;
+esac

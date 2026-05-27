@@ -20,28 +20,28 @@
   "analog_inputs": [
     {
       "name": "analog_1",
-      "path": "/sys/bus/iio/devices/iio:device0/in_voltage0_raw",
+      "path": "/var/lib/jupiter/iio/ads1015/in_voltage0_raw",
       "scale": 1.0,
       "offset": 0.0,
       "unit": "raw"
     },
     {
       "name": "analog_2",
-      "path": "/sys/bus/iio/devices/iio:device0/in_voltage1_raw",
+      "path": "/var/lib/jupiter/iio/ads1015/in_voltage1_raw",
       "scale": 1.0,
       "offset": 0.0,
       "unit": "raw"
     },
     {
       "name": "analog_3",
-      "path": "/sys/bus/iio/devices/iio:device0/in_voltage2_raw",
+      "path": "/var/lib/jupiter/iio/ads1015/in_voltage2_raw",
       "scale": 1.0,
       "offset": 0.0,
       "unit": "raw"
     },
     {
       "name": "analog_4",
-      "path": "/sys/bus/iio/devices/iio:device0/in_voltage3_raw",
+      "path": "/var/lib/jupiter/iio/ads1015/in_voltage3_raw",
       "scale": 1.0,
       "offset": 0.0,
       "unit": "raw"

@@ -9,6 +9,7 @@ start() {
     hwclock -s
 
     /usr/bin/jupiter-gpio-init
+    /usr/bin/jupiter-i2c init || jupiter_log init "i2c initialization failed"
     /usr/bin/jupiter-network-init
     /usr/bin/jupiter-services start
 
