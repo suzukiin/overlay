@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "tenant": "lab-service",
+  "environment": "production",
+  "site": {
+    "id": 2,
+    "name": "Curitiba/PR - AFIPE - Canal 15",
+    "city": "Curitiba",
+    "state": "PR",
+    "country": "BR"
+  },
+  "mqtt_topics": {
+    "base": "jupiter",
+    "pattern": "jupiter/{tenant}/{site_id}/{device_id}/{channel}"
+  },
+  "update_channel": "stable"
+}

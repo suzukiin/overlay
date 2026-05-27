@@ -1,22 +1,32 @@
 {
-  "host": "129.121.45.199",
-  "port": 1883,
-  "device_id": "JUP104260002",
-  "username": "JUP104260002",
-  "password": "lab850504c",
-  "client_id": "JUP104260002",
-  "fw_version": "0.0.1",
-  "snmp_community": "public",
-  "polling_interval": 10,
-  "identity_file": "/etc/jupiter/device.json",
-  "info_file": "/www/jupiter/config/info.json",
-  "inputs_file": "/www/jupiter/config/virtual_inputs.json",
-  "output_file": "/www/jupiter/public/telemetry_data.json",
-  "vin_status_path": "/dev/vin_status",
-  "relay_paths": [
-    "/dev/relay1",
-    "/dev/relay2"
-  ],
+  "schema_version": 1,
+  "gpio": {
+    "relay1": {
+      "number": 591,
+      "direction": "out",
+      "path": "/dev/relay1",
+      "active_high": true,
+      "safe_state": 0
+    },
+    "relay2": {
+      "number": 592,
+      "direction": "out",
+      "path": "/dev/relay2",
+      "active_high": true,
+      "safe_state": 0
+    },
+    "pwr_key": {
+      "number": 586,
+      "direction": "out",
+      "path": "/dev/pwr_key",
+      "safe_state": 0
+    },
+    "vin_status": {
+      "number": 575,
+      "direction": "in",
+      "path": "/dev/vin_status"
+    }
+  },
   "analog_inputs": [
     {
       "name": "analog_1",

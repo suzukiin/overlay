@@ -1,0 +1,58 @@
+#!/bin/sh
+
+. /usr/bin/jupiter-common
+
+export_gpio() {
+    local gpio="$1"
+    local direction="$2"
+    local link_path="$3"
+
+    if [ ! -d "/sys/class/gpio/gpio$gpio" ]; then
+        echo "$gpio" > /sys/class/gpio/export
+    fi
+
+    echo "$direction" > "/sys/class/gpio/gpio$gpio/direction"
+    ln -sf "/sys/class/gpio/gpio$gpio/value" "$link_path"
+}
+
+read_legacy_relay_state() {
+    if [ -f /var/lib/jupiter/state/relay_state ]; then
+        read relay1_state relay2_state < /var/lib/jupiter/state/relay_state
+    elif [ -f /etc/jupiter/relay_state ]; then
+        read relay1_state relay2_state < /etc/jupiter/relay_state
+    else
+        relay1_state=0
+        relay2_state=0
+    fi
+
+    case "$relay1_state" in
+        0|1) ;;
+        *) relay1_state=0 ;;
+    esac
+
+    case "$relay2_state" in
+        0|1) ;;
+        *) relay2_state=0 ;;
+    esac
+}
+
+persist_legacy_relay_state() {
+    echo "$relay1_state $relay2_state" > /var/lib/jupiter/state/relay_state
+    echo "$relay1_state $relay2_state" > /etc/jupiter/relay_state
+}
+
+jupiter_mkdirs
+
+export_gpio 591 out /dev/relay1
+export_gpio 592 out /dev/relay2
+export_gpio 586 out /dev/pwr_key
+export_gpio 575 in /dev/vin_status
+
+read_legacy_relay_state
+persist_legacy_relay_state
+
+echo "$relay1_state" > /dev/relay1
+echo "$relay2_state" > /dev/relay2
+echo 0 > /dev/pwr_key
+
+jupiter_log gpio "initialized relays=$relay1_state,$relay2_state"

@@ -1,0 +1,39 @@
+#!/bin/sh
+
+. /usr/bin/jupiter-common
+
+start_services() {
+    jupiter_mkdirs
+
+    if [ -f /etc/jupiter/secrets.env ]; then
+        . /etc/jupiter/secrets.env
+        export JUPITER_MQTT_PASSWORD
+    fi
+
+    jupiter_start_once httpd httpd -p 80 -h /www/jupiter
+    jupiter_start_once watchdog /usr/bin/jupiter-watchdog
+    jupiter_start_once monitor /usr/bin/jupiter-monitor /etc/jupiter/mqtt.json
+}
+
+stop_services() {
+    jupiter_stop httpd
+    jupiter_stop monitor
+    jupiter_stop watchdog
+}
+
+case "$1" in
+    start)
+        start_services
+        ;;
+    stop)
+        stop_services
+        ;;
+    restart)
+        stop_services
+        start_services
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart}"
+        exit 1
+        ;;
+esac

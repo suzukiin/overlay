@@ -1,5 +1,7 @@
 #!/bin/sh
 
+. /usr/bin/jupiter-common
+
 WATCHDOG_LOG_FILE="/var/log/watchdog.log"
 PEERS_DIR_FILE="/etc/ppp/peers/VIVO-PEERS"
 PEERS="VIVO-PEERS"
@@ -10,10 +12,11 @@ PWR_KEY="/dev/pwr_key"
 isUP=false
 
 log(){
+    jupiter_log watchdog "$1"
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> $WATCHDOG_LOG_FILE
 }
 
-function watchdog(){
+watchdog(){
 
     if [ "$isUP" = "false" ]; then
         pppd call $PEERS &
@@ -60,21 +63,21 @@ function watchdog(){
     fi
 }
 
-function reset_modem(){
+reset_modem(){
     log "Resetando modem..."
     power_off_modem
     sleep 5
     power_on_modem
 }
 
-function power_on_modem(){
+power_on_modem(){
     log "Ligando modem..."
     echo 1 > $PWR_KEY
     sleep 1
     echo 0 > $PWR_KEY
 }
 
-function power_off_modem(){
+power_off_modem(){
     log "Desligando modem..."
     echo 1 > $PWR_KEY
     sleep 5

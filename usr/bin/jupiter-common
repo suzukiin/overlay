@@ -1,0 +1,43 @@
+#!/bin/sh
+
+JUPITER_ETC="/etc/jupiter"
+JUPITER_RUN="/var/run/jupiter"
+JUPITER_STATE="/var/lib/jupiter/state"
+JUPITER_CACHE="/var/lib/jupiter/cache"
+JUPITER_LOG_DIR="/var/log/jupiter"
+
+jupiter_mkdirs() {
+    mkdir -p "$JUPITER_RUN" "$JUPITER_STATE" "$JUPITER_CACHE" "$JUPITER_LOG_DIR"
+}
+
+jupiter_log() {
+    local module="$1"
+    shift
+
+    jupiter_mkdirs
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [$module] $*" >> "$JUPITER_LOG_DIR/system.log"
+}
+
+jupiter_start_once() {
+    local name="$1"
+    shift
+
+    if pidof "$name" >/dev/null 2>&1; then
+        jupiter_log "$name" "already running"
+        return 0
+    fi
+
+    "$@" &
+    jupiter_log "$name" "started"
+}
+
+jupiter_stop() {
+    local name="$1"
+
+    if pidof "$name" >/dev/null 2>&1; then
+        killall "$name"
+        jupiter_log "$name" "stopped"
+    else
+        jupiter_log "$name" "not running"
+    fi
+}

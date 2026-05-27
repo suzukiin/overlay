@@ -1,0 +1,21 @@
+#!/bin/sh
+
+. /usr/bin/jupiter-common
+
+jupiter_mkdirs
+
+ifconfig eth0 192.168.1.100 netmask 255.255.255.0
+
+if [ -x /etc/network/ipAddr/IP.cfg ]; then
+    /etc/network/ipAddr/IP.cfg
+fi
+
+if [ -x /etc/network/NAT/NAT.cfg ]; then
+    /etc/network/NAT/NAT.cfg
+fi
+
+if command -v wg-quick >/dev/null 2>&1 && [ -f /etc/wireguard/wg0.conf ]; then
+    wg-quick up wg0 2>/dev/null
+fi
+
+jupiter_log network "initialized"
