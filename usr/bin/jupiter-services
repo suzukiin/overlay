@@ -4,29 +4,44 @@
 
 SCHEDULER_PID="$JUPITER_RUN/relay-scheduler.pid"
 
-start_scheduler() {
+start_pid_service() {
+    local name="$1"
+    local pid_file="$2"
+    shift 2
+
     jupiter_mkdirs
 
-    if [ -f "$SCHEDULER_PID" ] && kill -0 "$(cat "$SCHEDULER_PID")" 2>/dev/null; then
-        jupiter_log relay-scheduler "already running"
+    if [ -f "$pid_file" ] && kill -0 "$(cat "$pid_file")" 2>/dev/null; then
+        jupiter_log "$name" "already running"
         return 0
     fi
 
-    /usr/bin/jupiter-relay-scheduler &
-    echo "$!" > "$SCHEDULER_PID"
-    jupiter_log relay-scheduler "started pid=$(cat "$SCHEDULER_PID")"
+    "$@" &
+    echo "$!" > "$pid_file"
+    jupiter_log "$name" "started pid=$(cat "$pid_file")"
+}
+
+stop_pid_service() {
+    local name="$1"
+    local pid_file="$2"
+
+    if [ -f "$pid_file" ] && kill -0 "$(cat "$pid_file")" 2>/dev/null; then
+        kill "$(cat "$pid_file")"
+        rm -f "$pid_file"
+        jupiter_log "$name" "stopped"
+        return 0
+    fi
+
+    rm -f "$pid_file"
+    jupiter_log "$name" "not running"
+}
+
+start_scheduler() {
+    start_pid_service relay-scheduler "$SCHEDULER_PID" /usr/bin/jupiter-relay-scheduler
 }
 
 stop_scheduler() {
-    if [ -f "$SCHEDULER_PID" ] && kill -0 "$(cat "$SCHEDULER_PID")" 2>/dev/null; then
-        kill "$(cat "$SCHEDULER_PID")"
-        rm -f "$SCHEDULER_PID"
-        jupiter_log relay-scheduler "stopped"
-        return 0
-    fi
-
-    rm -f "$SCHEDULER_PID"
-    jupiter_log relay-scheduler "not running"
+    stop_pid_service relay-scheduler "$SCHEDULER_PID"
 }
 
 start_services() {
