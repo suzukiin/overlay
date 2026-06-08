@@ -58,54 +58,6 @@ body {
     text-shadow: 0 0 10px rgba(255, 111, 0, 0.3);
 }
 
-/* Sidebar */
-.sidebar {
-    position: fixed;
-    top: 57px;
-    bottom: 0;
-    left: 0;
-    z-index: 100;
-    padding: 0;
-    background-color: rgba(11, 12, 16, 0.6);
-    border-right: 1px solid var(--jupiter-border);
-    backdrop-filter: blur(5px);
-}
-
-.sidebar-heading {
-    color: var(--jupiter-secondary);
-    font-size: 0.75rem;
-    letter-spacing: 1.5px;
-}
-
-.status-item {
-    padding: 12px 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-    border-left: 2px solid transparent;
-    transition: all 0.3s ease;
-}
-
-.status-item:hover {
-    background: linear-gradient(90deg, rgba(255, 111, 0, 0.1) 0%, transparent 100%);
-    border-left: 2px solid var(--jupiter-accent);
-}
-
-.status-label {
-    font-size: 0.7rem;
-    color: #8892b0;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 2px;
-    display: flex;
-    align-items: center;
-}
-
-.status-value {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.9rem;
-    color: #e6e6e6;
-    padding-left: 22px;
-}
-
 /* Main */
 .main-content {
     margin-top: 57px;
@@ -286,47 +238,6 @@ h1.h2 {
     box-shadow: 0 0 8px rgba(255, 111, 0, 0.3);
 }
 
-/* LED Controls */
-.led-color-grid {
-    display: grid;
-    grid-template-columns: repeat(7, minmax(24px, 1fr));
-    gap: 8px;
-}
-
-.led-swatch {
-    width: 100%;
-    aspect-ratio: 1;
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-radius: 6px;
-    cursor: pointer;
-    transition: transform 0.15s ease, border-color 0.15s ease;
-}
-
-.led-swatch:hover {
-    transform: translateY(-1px);
-    border-color: rgba(255, 255, 255, 0.45);
-}
-
-.led-red { background: #ef4444; }
-.led-green { background: #22c55e; }
-.led-blue { background: #3b82f6; }
-.led-yellow { background: #eab308; }
-.led-cyan { background: #06b6d4; }
-.led-white { background: #f8fafc; }
-.led-off {
-    background: #111827;
-    position: relative;
-}
-
-.led-off::after {
-    content: "";
-    position: absolute;
-    inset: 45% 18%;
-    height: 2px;
-    background: #ef4444;
-    transform: rotate(-35deg);
-}
-
 /* ADS1015 Analog Inputs */
 .ads1015-channels {
     display: flex;
@@ -496,25 +407,6 @@ h1.h2 {
     box-shadow: 0 0 10px rgba(255, 111, 0, 0.3);
 }
 
-/* Local Provisioning */
-.provision-panel {
-    background: var(--jupiter-glass);
-    border: 1px solid var(--jupiter-border);
-    border-radius: 8px;
-    padding: 18px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-}
-
-.provision-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 14px;
-}
-
-.provision-password {
-    grid-column: span 2;
-}
-
 .modal-content {
     background-color: var(--jupiter-panel) !important;
 }
@@ -534,14 +426,6 @@ h1.h2 {
 }
 
 @media (max-width: 768px) {
-    .provision-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .provision-password {
-        grid-column: span 1;
-    }
-
     .scheduler-toolbar {
         align-items: flex-start;
         flex-direction: column;

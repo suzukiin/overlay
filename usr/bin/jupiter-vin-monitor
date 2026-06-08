@@ -9,13 +9,15 @@ fi
 
 VIN_STATUS_FILE="${JUPITER_VIN_STATUS_FILE:-/dev/vin_status}"
 VIN_LED="${JUPITER_VIN_LED:-0}"
-VIN_PRESENT_VALUE="${JUPITER_VIN_PRESENT_VALUE:-1}"
+VIN_PRESENT_VALUE="${JUPITER_VIN_PRESENT_VALUE:-0}"
 VIN_PRESENT_COLOR="${JUPITER_VIN_PRESENT_COLOR:-green}"
 VIN_MISSING_COLOR="${JUPITER_VIN_MISSING_COLOR:-red}"
+VIN_GPIOCHIP="${JUPITER_VIN_GPIOCHIP:-gpiochip0}"
+VIN_GPIO_LINE="${JUPITER_VIN_GPIO_LINE:-6}"
 CHECK_INTERVAL="${JUPITER_VIN_INTERVAL:-1}"
 LAST_VALUE=""
 
-if [ ! -e "$VIN_STATUS_FILE" ]; then
+if [ ! -e "$VIN_STATUS_FILE" ] && ! command -v gpioget >/dev/null 2>&1; then
     jupiter_log vin-monitor "status file missing path=$VIN_STATUS_FILE"
     echo "Erro: $VIN_STATUS_FILE nao existe" >&2
     exit 1
@@ -23,8 +25,25 @@ fi
 
 jupiter_log vin-monitor "started status_file=$VIN_STATUS_FILE led=$VIN_LED"
 
+read_vin_status() {
+    local value
+
+    if command -v gpioget >/dev/null 2>&1; then
+        value="$(gpioget -B disable "$VIN_GPIOCHIP" "$VIN_GPIO_LINE" 2>/dev/null)"
+        case "$value" in
+            0|1)
+                echo "$value" > "$VIN_STATUS_FILE" 2>/dev/null || true
+                echo "$value"
+                return 0
+                ;;
+        esac
+    fi
+
+    cat "$VIN_STATUS_FILE" 2>/dev/null
+}
+
 while true; do
-    value="$(cat "$VIN_STATUS_FILE" 2>/dev/null)"
+    value="$(read_vin_status)"
 
     if [ "$value" != "$LAST_VALUE" ]; then
         if [ "$value" = "$VIN_PRESENT_VALUE" ]; then

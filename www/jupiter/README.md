@@ -9,5 +9,3 @@ This is the canonical Node.js/Express root for the local device UI.
 - `package.json`: Node dependencies expected in the Buildroot image.
 
 Legacy CGI executables live in `/usr/libexec/jupiter/legacy-cgi` as migration reference only. Express serves equivalent `/cgi-bin/...` routes directly.
-
-The local provisioning endpoint remains `/cgi-bin/jupiter-config` for browser compatibility. It updates the device identity, site metadata and MQTT connection fields used by the embedded monitor.

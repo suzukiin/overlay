@@ -14,7 +14,7 @@
     "enabled": true,
     "status_file": "/dev/vin_status",
     "led": 0,
-    "present_value": "1",
+    "present_value": "0",
     "present_color": "green",
     "missing_color": "red",
     "interval_seconds": 1

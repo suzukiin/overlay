@@ -22,11 +22,6 @@ const paths = {
   info: devicePath("/www/jupiter/config/info.json"),
   virtualInputs: devicePath("/www/jupiter/config/virtual_inputs.json"),
   telemetryData: devicePath("/www/jupiter/public/telemetry_data.json"),
-  device: devicePath("/etc/jupiter/device.json"),
-  legacyDevice: devicePath("/etc/jupiter/jupiter.json"),
-  fleet: devicePath("/etc/jupiter/fleet.json"),
-  mqtt: devicePath("/etc/jupiter/mqtt.json"),
-  secrets: devicePath("/etc/jupiter/secrets.env"),
   relaySchedule: devicePath("/etc/jupiter/relay_schedule.json"),
   relayState: devicePath("/var/lib/jupiter/state/relay_state"),
   legacyRelayState: devicePath("/etc/jupiter/relay_state"),
@@ -36,11 +31,13 @@ const paths = {
   thermal: devicePath("/sys/class/thermal/thermal_zone0/temp"),
   netDev: devicePath("/proc/net/dev"),
   ttyUsb1: devicePath("/dev/ttyUSB1"),
+  getRssi: devicePath("/usr/libexec/jupiter/legacy-cgi/get-rssi"),
   relay1: devicePath("/dev/relay1"),
   relay2: devicePath("/dev/relay2"),
   vinStatus: devicePath("/dev/vin_status"),
-  ledDevice: devicePath("/dev/jupiter_leds"),
-  jupiterLed: devicePath("/usr/bin/jupiter-led"),
+  vinGpioChip: process.env.JUPITER_VIN_GPIOCHIP || "gpiochip0",
+  vinGpioLine: process.env.JUPITER_VIN_GPIO_LINE || "6",
+  vinPresentValue: process.env.JUPITER_VIN_PRESENT_VALUE || "0",
   adsDir: devicePath("/var/lib/jupiter/iio/ads1015")
 };
 
@@ -107,14 +104,6 @@ async function writeJson(file, data) {
 async function writeText(file, data, mode = 0o644) {
   await ensureDir(file);
   await fsp.writeFile(file, data, { mode });
-}
-
-function validKey(value) {
-  return typeof value === "string" && /^[A-Za-z0-9._-]+$/.test(value);
-}
-
-function validHost(value) {
-  return typeof value === "string" && /^[A-Za-z0-9._:-]+$/.test(value);
 }
 
 function numberOr(value, fallback) {
@@ -234,18 +223,68 @@ function execShell(script, timeout = 3500) {
   });
 }
 
+function execProgram(file, args = [], options = {}) {
+  return new Promise((resolve) => {
+    execFile(file, args, options, (err, stdout, stderr) => {
+      resolve({ err, stdout, stderr });
+    });
+  });
+}
+
+function parseCgiJson(output) {
+  const start = output.indexOf("{");
+  const end = output.lastIndexOf("}");
+
+  if (start === -1 || end === -1 || end < start) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(output.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+}
+
+async function readVinStatus() {
+  const gpio = await execProgram("gpioget", ["-B", "disable", paths.vinGpioChip, paths.vinGpioLine], {
+    timeout: 1000
+  });
+  const value = gpio.stdout.trim();
+
+  if (!gpio.err && /^[01]$/.test(value)) {
+    return value;
+  }
+
+  return (await readText(paths.vinStatus)).trim();
+}
+
 app.get(["/cgi-bin/get-rssi", "/api/rssi"], async (req, res) => {
+  if (await exists(paths.getRssi)) {
+    const result = await execProgram(paths.getRssi, [], {
+      cwd: path.dirname(paths.getRssi),
+      timeout: 3500
+    });
+    const cgiJson = parseCgiJson(result.stdout);
+
+    if (cgiJson) {
+      res.json(cgiJson);
+      return;
+    }
+  }
+
   if (!(await exists(paths.ttyUsb1))) {
     res.json(error("Erro ao abrir porta"));
     return;
   }
 
+  const tty = `'${shellQuote(paths.ttyUsb1)}'`;
   const script = [
-    `stty -F ${paths.ttyUsb1} 115200 raw -echo -icanon min 0 time 10 2>/dev/null || true`,
-    `printf 'ATE0\\r\\n' > ${paths.ttyUsb1}`,
+    `stty -F ${tty} 115200 raw -echo -icanon min 0 time 10 2>/dev/null || true`,
+    `printf 'ATE0\\r\\n' > ${tty}`,
     "sleep 0.1",
-    `printf 'AT+CSQ\\r\\n' > ${paths.ttyUsb1}`,
-    `timeout 2 cat ${paths.ttyUsb1}`
+    `printf 'AT+CSQ\\r\\n' > ${tty}`,
+    `timeout 2 cat ${tty}`
   ].join("; ");
   const { stdout } = await execShell(script);
   const match = stdout.match(/\+CSQ:\s*(\d+),\s*(\d+)/);
@@ -314,8 +353,8 @@ app.post(["/cgi-bin/relay-control", "/api/relay-control"], async (req, res) => {
 
 app.get(["/cgi-bin/get-vin-status", "/api/vin-status"], async (req, res) => {
   try {
-    const raw = (await readText(paths.vinStatus)).trim();
-    const present = raw === "1";
+    const raw = await readVinStatus();
+    const present = raw === paths.vinPresentValue;
     res.json(ok({
       raw,
       vin_status: Number(raw),
@@ -325,50 +364,6 @@ app.get(["/cgi-bin/get-vin-status", "/api/vin-status"], async (req, res) => {
   } catch {
     res.json(error("VIN status not available"));
   }
-});
-
-app.get(["/cgi-bin/led-control", "/api/led-control"], async (req, res) => {
-  const ledAvailable = await exists(paths.ledDevice);
-  const state = await readText(devicePath("/var/lib/jupiter/state/leds_state")).catch(() => "");
-  res.json(ok({
-    available: ledAvailable,
-    device: "/dev/jupiter_leds",
-    state: state.trim()
-  }));
-});
-
-app.post(["/cgi-bin/led-control", "/api/led-control"], async (req, res) => {
-  const led = String(req.query.led ?? req.body?.led ?? "").trim();
-  const color = String(req.query.color ?? req.body?.color ?? "").trim();
-  const validColors = new Set(["off", "red", "green", "blue", "yellow", "magenta", "cyan", "white", "orange"]);
-
-  if (!/^[0-5]$/.test(led) || !validColors.has(color)) {
-    res.json(error("Invalid led or color"));
-    return;
-  }
-
-  execFile(paths.jupiterLed, ["set", led, color], {
-    timeout: 2000,
-    env: {
-      ...process.env,
-      JUPITER_COMMON: devicePath("/usr/bin/jupiter-common"),
-      JUPITER_LED_DEV: paths.ledDevice,
-      JUPITER_LED_STATE: devicePath("/var/lib/jupiter/state/leds_state")
-    }
-  }, async (err) => {
-    if (err) {
-      res.json(error("Failed to set led"));
-      return;
-    }
-
-    const state = await readText(devicePath("/var/lib/jupiter/state/leds_state")).catch(() => "");
-    res.json(ok({
-      available: true,
-      led: Number(led),
-      color,
-      state: state.trim()
-    }));
-  });
 });
 
 app.get(["/cgi-bin/relay-schedule", "/api/relay-schedule"], async (req, res) => {
@@ -481,141 +476,6 @@ app.post(["/cgi-bin/get-ads1015", "/api/ads1015"], async (req, res) => {
     res.json(ok({ channels }));
   } catch {
     res.json(error("ADS1015 not available"));
-  }
-});
-
-async function getProvisionConfig() {
-  const device = await readJson(paths.device, {});
-  const legacyDevice = await readJson(paths.legacyDevice, {});
-  const fleet = await readJson(paths.fleet, {});
-  const mqtt = await readJson(paths.mqtt, {});
-  const info = await readJson(paths.info, {});
-  const deviceId = device.device_id || legacyDevice.device_id || mqtt.device_id || info.deviceId || "";
-  const site = fleet.site || {};
-
-  return {
-    device_id: deviceId,
-    client: info.client || fleet.tenant || "",
-    location: info.location || site.name || "",
-    site_id: info.siteId || site.id || "",
-    site_name: info.siteName || site.name || "",
-    city: info.city || site.city || "",
-    state: info.state || site.state || "",
-    fw_version: device.firmware_version || mqtt.fw_version || info.version || "0.0.1",
-    mqtt_host: mqtt.host || "",
-    mqtt_port: mqtt.port || 1883,
-    mqtt_username: mqtt.username || deviceId,
-    mqtt_client_id: mqtt.client_id || deviceId,
-    has_mqtt_secret: await exists(paths.secrets)
-  };
-}
-
-app.get(["/cgi-bin/jupiter-config", "/api/jupiter-config"], async (req, res) => {
-  res.json(ok(await getProvisionConfig()));
-});
-
-app.post(["/cgi-bin/jupiter-config", "/api/jupiter-config"], async (req, res) => {
-  const data = req.body || {};
-  const deviceId = String(data.device_id || "").trim();
-  const mqttPort = Number(data.mqtt_port || 1883);
-  const mqttHost = String(data.mqtt_host || "").trim();
-  const username = String(data.mqtt_username || deviceId).trim();
-  const clientId = String(data.mqtt_client_id || deviceId).trim();
-  const fwVersion = String(data.fw_version || "0.0.1").trim();
-
-  if (!validKey(deviceId)) {
-    res.json(error("Device ID invalido"));
-    return;
-  }
-  if (username !== deviceId) {
-    res.json(error("O usuario MQTT precisa ser igual ao Device ID"));
-    return;
-  }
-  if (!validHost(mqttHost) || !Number.isInteger(mqttPort) || mqttPort < 1 || mqttPort > 65535) {
-    res.json(error("MQTT host ou porta invalida"));
-    return;
-  }
-
-  const siteId = data.site_id || "unknown-site";
-  const siteName = data.site_name || data.location || String(siteId);
-  const client = data.client || "lab-service";
-  const city = data.city || "";
-  const state = String(data.state || "").toUpperCase();
-  const previousMqtt = await readJson(paths.mqtt, {});
-
-  const device = {
-    schema_version: 1,
-    device_id: deviceId,
-    serial_number: deviceId,
-    model: "jupiter-telemetry",
-    hardware_revision: "rev-a",
-    firmware_version: fwVersion,
-    provisioning: {
-      mode: "factory",
-      status: "provisioned"
-    }
-  };
-
-  const fleet = {
-    schema_version: 1,
-    tenant: client,
-    environment: "production",
-    site: {
-      id: siteId,
-      name: siteName,
-      city,
-      state,
-      country: "BR"
-    },
-    mqtt_topics: {
-      base: "jupiter",
-      pattern: "jupiter/{device_id}/{channel}"
-    },
-    update_channel: "stable"
-  };
-
-  const info = {
-    location: data.location || siteName,
-    client,
-    deviceId,
-    wanIp: "",
-    lanIp: "",
-    version: fwVersion,
-    siteId,
-    siteName,
-    city,
-    state
-  };
-
-  const mqtt = {
-    ...previousMqtt,
-    host: mqttHost,
-    port: mqttPort,
-    device_id: deviceId,
-    username,
-    password: "",
-    client_id: clientId,
-    fw_version: fwVersion,
-    identity_file: "/etc/jupiter/device.json",
-    info_file: "/www/jupiter/config/info.json",
-    inputs_file: "/www/jupiter/config/virtual_inputs.json",
-    output_file: "/www/jupiter/public/telemetry_data.json"
-  };
-
-  try {
-    await writeJson(paths.device, device);
-    await writeJson(paths.legacyDevice, { device_id: deviceId });
-    await writeJson(paths.fleet, fleet);
-    await writeJson(paths.info, info);
-    await writeJson(paths.mqtt, mqtt);
-
-    if (data.mqtt_password) {
-      await writeText(paths.secrets, `# Generated by jupiter-web.\nJUPITER_MQTT_PASSWORD='${shellQuote(data.mqtt_password)}'\n`, 0o600);
-    }
-
-    res.json(ok(await getProvisionConfig()));
-  } catch {
-    res.json(error("Erro ao salvar provisionamento"));
   }
 });
 

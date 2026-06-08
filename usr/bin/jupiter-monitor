@@ -1,3 +1,99 @@
 #!/bin/sh
 
-exec /home/proc/monitor "$@"
+COMMON="${JUPITER_COMMON:-/usr/bin/jupiter-common}"
+if [ ! -f "$COMMON" ]; then
+    COMMON="$(dirname "$0")/jupiter-common"
+fi
+
+. "$COMMON"
+
+MONITOR_BIN="${JUPITER_MONITOR_BIN:-/home/proc/monitor}"
+CONFIG_FILE="${1:-/etc/jupiter/mqtt.json}"
+NETWORK_WAIT="${JUPITER_MONITOR_NETWORK_WAIT:-120}"
+RESTART_DELAY="${JUPITER_MONITOR_RESTART_DELAY:-10}"
+child_pid=""
+
+json_get_string() {
+    file="$1"
+    key="$2"
+    [ -f "$file" ] || return 0
+    sed -n 's/.*"'"$key"'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$file" | head -n 1
+}
+
+json_get_number() {
+    file="$1"
+    key="$2"
+    [ -f "$file" ] || return 0
+    sed -n 's/.*"'"$key"'"[[:space:]]*:[[:space:]]*\([-0-9.][0-9.]*\).*/\1/p' "$file" | head -n 1
+}
+
+stop_child() {
+    if [ -n "$child_pid" ] && kill -0 "$child_pid" 2>/dev/null; then
+        kill "$child_pid" 2>/dev/null || true
+        wait "$child_pid" 2>/dev/null || true
+    fi
+    exit 0
+}
+
+broker_reachable() {
+    local host="$1"
+    local port="$2"
+
+    [ -n "$host" ] || return 1
+    [ -n "$port" ] || port=1883
+
+    if command -v nc >/dev/null 2>&1; then
+        nc -z -w 3 "$host" "$port" >/dev/null 2>&1
+        return $?
+    fi
+
+    if command -v ping >/dev/null 2>&1; then
+        ping -c 1 -W 2 "$host" >/dev/null 2>&1
+        return $?
+    fi
+
+    return 0
+}
+
+wait_for_broker() {
+    local host
+    local port
+    local waited=0
+
+    host="$(json_get_string "$CONFIG_FILE" host)"
+    port="$(json_get_number "$CONFIG_FILE" port)"
+    [ -n "$port" ] || port=1883
+
+    while [ "$waited" -lt "$NETWORK_WAIT" ]; do
+        if broker_reachable "$host" "$port"; then
+            jupiter_log monitor "broker reachable host=$host port=$port waited=${waited}s"
+            return 0
+        fi
+
+        sleep 2
+        waited=$((waited + 2))
+    done
+
+    jupiter_log monitor "starting without broker reachability host=$host port=$port waited=${waited}s"
+    return 0
+}
+
+trap stop_child INT TERM
+
+if [ ! -x "$MONITOR_BIN" ]; then
+    jupiter_log monitor "binary not executable path=$MONITOR_BIN"
+    exit 1
+fi
+
+while true; do
+    wait_for_broker
+
+    "$MONITOR_BIN" "$@" &
+    child_pid="$!"
+    wait "$child_pid"
+    rc="$?"
+    child_pid=""
+
+    jupiter_log monitor "exited rc=$rc; restarting in ${RESTART_DELAY}s"
+    sleep "$RESTART_DELAY"
+done

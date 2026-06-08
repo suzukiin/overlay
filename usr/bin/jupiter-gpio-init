@@ -15,6 +15,36 @@ export_gpio() {
     ln -sf "/sys/class/gpio/gpio$gpio/value" "$link_path"
 }
 
+configure_vin_bias() {
+    local chip="${JUPITER_VIN_GPIOCHIP:-gpiochip0}"
+    local line="${JUPITER_VIN_GPIO_LINE:-6}"
+    local value
+
+    if command -v gpioget >/dev/null 2>&1; then
+        value="$(gpioget -B disable "$chip" "$line" 2>/dev/null)" || {
+            jupiter_log gpio "failed to disable vin bias chip=$chip line=$line"
+            return 1
+        }
+
+        case "$value" in
+            0|1)
+                rm -f /dev/vin_status
+                echo "$value" > /dev/vin_status
+                chmod 0644 /dev/vin_status
+                jupiter_log gpio "vin bias disabled chip=$chip line=$line value=$value"
+                return 0
+                ;;
+            *)
+                jupiter_log gpio "invalid vin value from gpioget chip=$chip line=$line value=$value"
+                return 1
+                ;;
+        esac
+    else
+        jupiter_log gpio "gpioget not available; vin bias not changed"
+        return 1
+    fi
+}
+
 read_legacy_relay_state() {
     if [ -f /var/lib/jupiter/state/relay_state ]; then
         read relay1_state relay2_state < /var/lib/jupiter/state/relay_state
@@ -46,7 +76,7 @@ jupiter_mkdirs
 export_gpio 591 out /dev/relay1
 export_gpio 592 out /dev/relay2
 export_gpio 586 out /dev/pwr_key
-export_gpio 575 in /dev/vin_status
+configure_vin_bias || export_gpio 575 in /dev/vin_status
 
 read_legacy_relay_state
 persist_legacy_relay_state

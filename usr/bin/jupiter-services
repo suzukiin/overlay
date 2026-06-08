@@ -5,6 +5,7 @@
 SCHEDULER_PID="$JUPITER_RUN/relay-scheduler.pid"
 WEB_PID="$JUPITER_RUN/web.pid"
 VIN_MONITOR_PID="$JUPITER_RUN/vin-monitor.pid"
+MONITOR_PID="$JUPITER_RUN/monitor.pid"
 
 start_pid_service() {
     local name="$1"
@@ -46,9 +47,13 @@ start_web() {
     start_pid_service web "$WEB_PID" /usr/bin/jupiter-web
 }
 
+start_monitor() {
+    start_pid_service monitor "$MONITOR_PID" /usr/bin/jupiter-monitor /etc/jupiter/mqtt.json
+}
+
 start_vin_monitor() {
     /usr/bin/jupiter-led-init || jupiter_log led "initialization failed; continuing without leds"
-    if [ -e /dev/jupiter_leds ] && [ -e /dev/vin_status ]; then
+    if [ -e /dev/jupiter_leds ] && { [ -e /dev/vin_status ] || command -v gpioget >/dev/null 2>&1; }; then
         start_pid_service vin-monitor "$VIN_MONITOR_PID" /usr/bin/jupiter-vin-monitor
     else
         jupiter_log vin-monitor "not started; missing led or vin device"
@@ -79,7 +84,7 @@ start_services() {
 
     start_web
     jupiter_start_once watchdog /usr/bin/jupiter-watchdog
-    jupiter_start_once monitor /usr/bin/jupiter-monitor /etc/jupiter/mqtt.json
+    start_monitor
     start_scheduler
     start_vin_monitor
 }
@@ -87,7 +92,7 @@ start_services() {
 stop_services() {
     stop_vin_monitor
     stop_web
-    jupiter_stop monitor
+    stop_pid_service monitor "$MONITOR_PID"
     jupiter_stop watchdog
     stop_scheduler
 }
