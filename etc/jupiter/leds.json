@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "device": "/dev/jupiter_leds",
+  "driver_module": "ws2812-pio-rp1",
+  "state_file": "/var/lib/jupiter/state/leds_state",
+  "count": 6,
+  "visual_to_physical": [0, 1, 2, 5, 4, 3],
+  "boot": {
+    "enabled": true,
+    "led": 5,
+    "color": "cyan"
+  },
+  "vin": {
+    "enabled": true,
+    "status_file": "/dev/vin_status",
+    "led": 0,
+    "present_value": "1",
+    "present_color": "green",
+    "missing_color": "red",
+    "interval_seconds": 1
+  }
+}

@@ -1,0 +1,91 @@
+#!/bin/sh
+
+. /usr/bin/jupiter-common
+
+DEVICE_FILE="/etc/jupiter/device.json"
+MQTT_FILE="/etc/jupiter/mqtt.json"
+INFO_FILE="/www/jupiter/config/info.json"
+INPUTS_FILE="/www/jupiter/config/virtual_inputs.json"
+SECRETS_FILE="/etc/jupiter/secrets.env"
+
+errors=0
+warnings=0
+
+json_get_string() {
+    file="$1"
+    key="$2"
+    [ -f "$file" ] || return 0
+    sed -n 's/.*"'$key'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$file" | head -n 1
+}
+
+json_get_number() {
+    file="$1"
+    key="$2"
+    [ -f "$file" ] || return 0
+    sed -n 's/.*"'$key'"[[:space:]]*:[[:space:]]*\([-0-9.][0-9.]*\).*/\1/p' "$file" | head -n 1
+}
+
+warn() {
+    warnings=$((warnings + 1))
+    jupiter_log config-check "WARN $1"
+    echo "WARN: $1"
+}
+
+err() {
+    errors=$((errors + 1))
+    jupiter_log config-check "ERROR $1"
+    echo "ERROR: $1"
+}
+
+require_file() {
+    [ -f "$1" ] || err "arquivo ausente: $1"
+}
+
+require_file "$DEVICE_FILE"
+require_file "$MQTT_FILE"
+require_file "$INFO_FILE"
+require_file "$INPUTS_FILE"
+
+device_id="$(json_get_string "$DEVICE_FILE" device_id)"
+mqtt_device_id="$(json_get_string "$MQTT_FILE" device_id)"
+mqtt_username="$(json_get_string "$MQTT_FILE" username)"
+mqtt_client_id="$(json_get_string "$MQTT_FILE" client_id)"
+mqtt_host="$(json_get_string "$MQTT_FILE" host)"
+mqtt_port="$(json_get_number "$MQTT_FILE" port)"
+info_device_id="$(json_get_string "$INFO_FILE" deviceId)"
+mqtt_password="$(json_get_string "$MQTT_FILE" password)"
+
+[ -n "$device_id" ] || err "device_id vazio em $DEVICE_FILE"
+[ -n "$mqtt_host" ] || err "host MQTT vazio em $MQTT_FILE"
+[ -n "$mqtt_port" ] || err "porta MQTT vazia em $MQTT_FILE"
+
+if [ -n "$device_id" ] && [ -n "$mqtt_device_id" ] && [ "$device_id" != "$mqtt_device_id" ]; then
+    err "device_id divergente: device=$device_id mqtt=$mqtt_device_id"
+fi
+
+if [ -n "$device_id" ] && [ -n "$mqtt_username" ] && [ "$device_id" != "$mqtt_username" ]; then
+    err "username MQTT deve corresponder ao device_id: device=$device_id username=$mqtt_username"
+fi
+
+if [ -n "$device_id" ] && [ -n "$mqtt_client_id" ] && [ "$device_id" != "$mqtt_client_id" ]; then
+    warn "client_id MQTT diferente do device_id: device=$device_id client_id=$mqtt_client_id"
+fi
+
+if [ -n "$device_id" ] && [ -n "$info_device_id" ] && [ "$device_id" != "$info_device_id" ]; then
+    warn "deviceId do dashboard divergente: device=$device_id info=$info_device_id"
+fi
+
+if [ -n "$mqtt_password" ]; then
+    warn "senha MQTT em texto no mqtt.json; preferir /etc/jupiter/secrets.env"
+fi
+
+if [ ! -f "$SECRETS_FILE" ] && [ -z "$mqtt_password" ]; then
+    warn "senha MQTT não encontrada em secrets.env nem em mqtt.json"
+fi
+
+if [ -f "$INPUTS_FILE" ] && ! grep -q '"equipamentos"' "$INPUTS_FILE"; then
+    warn "arquivo de entradas SNMP não possui lista equipamentos"
+fi
+
+echo "Jupiter config check: errors=$errors warnings=$warnings"
+[ "$errors" -eq 0 ]

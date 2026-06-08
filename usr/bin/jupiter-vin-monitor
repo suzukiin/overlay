@@ -1,0 +1,41 @@
+#!/bin/sh
+
+COMMON="${JUPITER_COMMON:-/usr/bin/jupiter-common}"
+if [ ! -f "$COMMON" ]; then
+    COMMON="$(dirname "$0")/jupiter-common"
+fi
+
+. "$COMMON"
+
+VIN_STATUS_FILE="${JUPITER_VIN_STATUS_FILE:-/dev/vin_status}"
+VIN_LED="${JUPITER_VIN_LED:-0}"
+VIN_PRESENT_VALUE="${JUPITER_VIN_PRESENT_VALUE:-1}"
+VIN_PRESENT_COLOR="${JUPITER_VIN_PRESENT_COLOR:-green}"
+VIN_MISSING_COLOR="${JUPITER_VIN_MISSING_COLOR:-red}"
+CHECK_INTERVAL="${JUPITER_VIN_INTERVAL:-1}"
+LAST_VALUE=""
+
+if [ ! -e "$VIN_STATUS_FILE" ]; then
+    jupiter_log vin-monitor "status file missing path=$VIN_STATUS_FILE"
+    echo "Erro: $VIN_STATUS_FILE nao existe" >&2
+    exit 1
+fi
+
+jupiter_log vin-monitor "started status_file=$VIN_STATUS_FILE led=$VIN_LED"
+
+while true; do
+    value="$(cat "$VIN_STATUS_FILE" 2>/dev/null)"
+
+    if [ "$value" != "$LAST_VALUE" ]; then
+        if [ "$value" = "$VIN_PRESENT_VALUE" ]; then
+            /usr/bin/jupiter-led set "$VIN_LED" "$VIN_PRESENT_COLOR" || true
+            jupiter_log vin-monitor "vin present value=$value led=$VIN_LED color=$VIN_PRESENT_COLOR"
+        else
+            /usr/bin/jupiter-led set "$VIN_LED" "$VIN_MISSING_COLOR" || true
+            jupiter_log vin-monitor "vin missing value=$value led=$VIN_LED color=$VIN_MISSING_COLOR"
+        fi
+        LAST_VALUE="$value"
+    fi
+
+    sleep "$CHECK_INTERVAL"
+done

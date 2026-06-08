@@ -11,7 +11,7 @@
   },
   "mqtt_topics": {
     "base": "jupiter",
-    "pattern": "jupiter/{tenant}/{site_id}/{device_id}/{channel}"
+    "pattern": "jupiter/{device_id}/{channel}"
   },
   "update_channel": "stable"
 }

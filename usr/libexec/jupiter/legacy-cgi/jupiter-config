@@ -1,0 +1,280 @@
+#!/bin/sh
+
+CONTENT_TYPE_JSON="Content-Type: application/json"
+DEVICE_FILE="/etc/jupiter/device.json"
+LEGACY_DEVICE_FILE="/etc/jupiter/jupiter.json"
+FLEET_FILE="/etc/jupiter/fleet.json"
+MQTT_FILE="/etc/jupiter/mqtt.json"
+INFO_FILE="/www/jupiter/config/info.json"
+SECRETS_FILE="/etc/jupiter/secrets.env"
+
+print_json_header() {
+    echo "$CONTENT_TYPE_JSON"
+    echo ""
+}
+
+fail() {
+    print_json_header
+    printf '{"status":"Error","msg":"%s"}\n' "$(json_escape "$1")"
+    exit 0
+}
+
+ok() {
+    print_json_header
+    printf '{"status":"Success","msg":"%s"}\n' "$(json_escape "$1")"
+    exit 0
+}
+
+json_escape() {
+    printf "%s" "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+json_get_string() {
+    file="$1"
+    key="$2"
+    [ -f "$file" ] || return 0
+    sed -n 's/.*"'$key'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$file" | head -n 1
+}
+
+json_get_number() {
+    file="$1"
+    key="$2"
+    [ -f "$file" ] || return 0
+    sed -n 's/.*"'$key'"[[:space:]]*:[[:space:]]*\([-0-9.][0-9.]*\).*/\1/p' "$file" | head -n 1
+}
+
+body_get_string() {
+    key="$1"
+    printf "%s" "$BODY" | sed -n 's/.*"'$key'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1
+}
+
+body_get_number() {
+    key="$1"
+    printf "%s" "$BODY" | sed -n 's/.*"'$key'"[[:space:]]*:[[:space:]]*\([-0-9.][0-9.]*\).*/\1/p' | head -n 1
+}
+
+validate_key() {
+    name="$1"
+    value="$2"
+    case "$value" in
+        ""|*[!A-Za-z0-9._-]*)
+            fail "$name inválido. Use letras, números, ponto, underline ou hífen."
+            ;;
+    esac
+}
+
+validate_port() {
+    value="$1"
+    case "$value" in
+        ""|*[!0-9]*)
+            fail "Porta MQTT inválida."
+            ;;
+    esac
+
+    [ "$value" -ge 1 ] 2>/dev/null || fail "Porta MQTT inválida."
+    [ "$value" -le 65535 ] 2>/dev/null || fail "Porta MQTT inválida."
+}
+
+write_file() {
+    target="$1"
+    tmp="$target.tmp.$$"
+
+    mkdir -p "$(dirname "$target")" || fail "Falha ao preparar diretório de configuração."
+    cat > "$tmp" || fail "Falha ao criar arquivo temporário."
+
+    if [ -f "$target" ]; then
+        cp "$target" "$target.bkp" 2>/dev/null
+    fi
+
+    mv "$tmp" "$target" || fail "Falha ao gravar $target."
+}
+
+show_config() {
+    device_id="$(json_get_string "$DEVICE_FILE" device_id)"
+    [ -n "$device_id" ] || device_id="$(json_get_string "$MQTT_FILE" device_id)"
+
+    client="$(json_get_string "$INFO_FILE" client)"
+    location="$(json_get_string "$INFO_FILE" location)"
+    site_id="$(json_get_string "$INFO_FILE" siteId)"
+    [ -n "$site_id" ] || site_id="$(json_get_number "$INFO_FILE" siteId)"
+    site_name="$(json_get_string "$INFO_FILE" siteName)"
+    city="$(json_get_string "$INFO_FILE" city)"
+    state="$(json_get_string "$INFO_FILE" state)"
+    wan_ip="$(json_get_string "$INFO_FILE" wanIp)"
+    lan_ip="$(json_get_string "$INFO_FILE" lanIp)"
+    fw_version="$(json_get_string "$DEVICE_FILE" firmware_version)"
+
+    mqtt_host="$(json_get_string "$MQTT_FILE" host)"
+    mqtt_port="$(json_get_number "$MQTT_FILE" port)"
+    mqtt_username="$(json_get_string "$MQTT_FILE" username)"
+    mqtt_client_id="$(json_get_string "$MQTT_FILE" client_id)"
+    mqtt_tls="$(json_get_string "$MQTT_FILE" tls)"
+
+    print_json_header
+    printf '{'
+    printf '"status":"Success","data":{'
+    printf '"device_id":"%s",' "$(json_escape "$device_id")"
+    printf '"client":"%s",' "$(json_escape "$client")"
+    printf '"location":"%s",' "$(json_escape "$location")"
+    printf '"site_id":"%s",' "$(json_escape "$site_id")"
+    printf '"site_name":"%s",' "$(json_escape "$site_name")"
+    printf '"city":"%s",' "$(json_escape "$city")"
+    printf '"state":"%s",' "$(json_escape "$state")"
+    printf '"wan_ip":"%s",' "$(json_escape "$wan_ip")"
+    printf '"lan_ip":"%s",' "$(json_escape "$lan_ip")"
+    printf '"fw_version":"%s",' "$(json_escape "$fw_version")"
+    printf '"mqtt_host":"%s",' "$(json_escape "$mqtt_host")"
+    printf '"mqtt_port":"%s",' "$(json_escape "$mqtt_port")"
+    printf '"mqtt_username":"%s",' "$(json_escape "$mqtt_username")"
+    printf '"mqtt_client_id":"%s",' "$(json_escape "$mqtt_client_id")"
+    printf '"mqtt_tls":"%s",' "$(json_escape "$mqtt_tls")"
+    if [ -f "$SECRETS_FILE" ]; then
+        printf '"has_mqtt_secret":true'
+    else
+        printf '"has_mqtt_secret":false'
+    fi
+    printf '}}\n'
+}
+
+save_config() {
+    BODY="$(dd bs=1 count="${CONTENT_LENGTH:-0}" 2>/dev/null)"
+
+    device_id="$(body_get_string device_id)"
+    client="$(body_get_string client)"
+    location="$(body_get_string location)"
+    site_id="$(body_get_string site_id)"
+    site_name="$(body_get_string site_name)"
+    city="$(body_get_string city)"
+    state="$(body_get_string state)"
+    fw_version="$(body_get_string fw_version)"
+    mqtt_host="$(body_get_string mqtt_host)"
+    mqtt_port="$(body_get_number mqtt_port)"
+    mqtt_username="$(body_get_string mqtt_username)"
+    mqtt_client_id="$(body_get_string mqtt_client_id)"
+    mqtt_password="$(body_get_string mqtt_password)"
+
+    [ -n "$device_id" ] || fail "Device ID obrigatório."
+    [ -n "$mqtt_host" ] || fail "Host MQTT obrigatório."
+    [ -n "$mqtt_port" ] || mqtt_port="1883"
+    [ -n "$mqtt_username" ] || mqtt_username="$device_id"
+    [ -n "$mqtt_client_id" ] || mqtt_client_id="$device_id"
+    [ -n "$fw_version" ] || fw_version="0.0.1"
+    [ -n "$site_id" ] || site_id="unknown-site"
+    [ -n "$site_name" ] || site_name="$site_id"
+    [ -n "$location" ] || location="$site_name"
+    [ -n "$client" ] || client="--"
+    [ -n "$city" ] || city="--"
+    [ -n "$state" ] || state="--"
+
+    validate_key "Device ID" "$device_id"
+    validate_key "Usuário MQTT" "$mqtt_username"
+    validate_key "Client ID MQTT" "$mqtt_client_id"
+    validate_port "$mqtt_port"
+
+    [ "$mqtt_username" = "$device_id" ] || fail "Usuário MQTT deve ser igual ao Device ID autorizado na ACL."
+
+    write_file "$DEVICE_FILE" <<EOF
+{
+  "schema_version": 1,
+  "device_id": "$(json_escape "$device_id")",
+  "serial_number": "$(json_escape "$device_id")",
+  "model": "jupiter-telemetry",
+  "hardware_revision": "rev-a",
+  "firmware_version": "$(json_escape "$fw_version")",
+  "provisioning": {
+    "mode": "web",
+    "status": "provisioned"
+  }
+}
+EOF
+
+    write_file "$LEGACY_DEVICE_FILE" <<EOF
+{
+  "device_id": "$(json_escape "$device_id")"
+}
+EOF
+
+    write_file "$FLEET_FILE" <<EOF
+{
+  "schema_version": 1,
+  "tenant": "lab-service",
+  "environment": "production",
+  "site": {
+    "id": "$(json_escape "$site_id")",
+    "name": "$(json_escape "$site_name")",
+    "city": "$(json_escape "$city")",
+    "state": "$(json_escape "$state")",
+    "country": "BR"
+  },
+  "mqtt_topics": {
+    "base": "jupiter",
+    "pattern": "jupiter/{device_id}/{channel}"
+  },
+  "update_channel": "stable"
+}
+EOF
+
+    write_file "$INFO_FILE" <<EOF
+{
+  "location": "$(json_escape "$location")",
+  "client": "$(json_escape "$client")",
+  "deviceId": "$(json_escape "$device_id")",
+  "wanIp": "$(json_escape "$(json_get_string "$INFO_FILE" wanIp)")",
+  "lanIp": "$(json_escape "$(json_get_string "$INFO_FILE" lanIp)")",
+  "version": "$(json_escape "$fw_version")",
+  "siteId": "$(json_escape "$site_id")",
+  "siteName": "$(json_escape "$site_name")",
+  "city": "$(json_escape "$city")",
+  "state": "$(json_escape "$state")"
+}
+EOF
+
+    write_file "$MQTT_FILE" <<EOF
+{
+  "host": "$(json_escape "$mqtt_host")",
+  "port": $mqtt_port,
+  "device_id": "$(json_escape "$device_id")",
+  "username": "$(json_escape "$mqtt_username")",
+  "password": "",
+  "client_id": "$(json_escape "$mqtt_client_id")",
+  "fw_version": "$(json_escape "$fw_version")",
+  "snmp_community": "public",
+  "polling_interval": 10,
+  "identity_file": "/etc/jupiter/device.json",
+  "info_file": "/www/jupiter/config/info.json",
+  "inputs_file": "/www/jupiter/config/virtual_inputs.json",
+  "output_file": "/www/jupiter/public/telemetry_data.json",
+  "vin_status_path": "/dev/vin_status",
+  "relay_paths": [
+    "/dev/relay1",
+    "/dev/relay2"
+  ],
+  "analog_inputs": [
+    { "name": "analog_1", "path": "/var/lib/jupiter/iio/ads1015/in_voltage0_raw", "scale": 1.0, "offset": 0.0, "unit": "raw" },
+    { "name": "analog_2", "path": "/var/lib/jupiter/iio/ads1015/in_voltage1_raw", "scale": 1.0, "offset": 0.0, "unit": "raw" },
+    { "name": "analog_3", "path": "/var/lib/jupiter/iio/ads1015/in_voltage2_raw", "scale": 1.0, "offset": 0.0, "unit": "raw" },
+    { "name": "analog_4", "path": "/var/lib/jupiter/iio/ads1015/in_voltage3_raw", "scale": 1.0, "offset": 0.0, "unit": "raw" }
+  ]
+}
+EOF
+
+    if [ -n "$mqtt_password" ]; then
+        quoted_password="$(printf "%s" "$mqtt_password" | sed "s/'/'\\\\''/g")"
+        {
+            echo "# Generated by Jupiter local provisioning."
+            echo "JUPITER_MQTT_PASSWORD='$quoted_password'"
+        } > "$SECRETS_FILE" || fail "Falha ao gravar senha MQTT."
+        chmod 600 "$SECRETS_FILE"
+    fi
+
+    ok "Configuração salva. Reinicie os serviços para aplicar o MQTT."
+}
+
+case "$REQUEST_METHOD" in
+    POST)
+        save_config
+        ;;
+    *)
+        show_config
+        ;;
+esac

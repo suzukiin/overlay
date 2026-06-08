@@ -1,0 +1,23 @@
+#!/bin/sh
+
+COMMON="${JUPITER_COMMON:-/usr/bin/jupiter-common}"
+if [ ! -f "$COMMON" ]; then
+    COMMON="$(dirname "$0")/jupiter-common"
+fi
+
+. "$COMMON"
+
+WEB_ROOT="${JUPITER_WEB_ROOT:-/www/jupiter}"
+WEB_PORT="${JUPITER_WEB_PORT:-80}"
+DEVICE_ROOT="${JUPITER_DEVICE_ROOT:-/}"
+
+export NODE_ENV="${NODE_ENV:-production}"
+export JUPITER_WEB_PORT="$WEB_PORT"
+export JUPITER_DEVICE_ROOT="$DEVICE_ROOT"
+
+cd "$WEB_ROOT" || {
+    jupiter_log web "failed to enter WEB_ROOT=$WEB_ROOT"
+    exit 1
+}
+
+exec node server.js

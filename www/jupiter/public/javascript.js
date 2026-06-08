@@ -18,6 +18,122 @@ document.addEventListener("DOMContentLoaded", function () {
 
     }
 
+    function setProvisionStatus(text, tone = "secondary") {
+        const element = document.getElementById("provision-status");
+        if (!element) return;
+
+        element.textContent = text;
+        element.className = `badge bg-dark border border-${tone} text-${tone} font-mono`;
+    }
+
+    function setValue(id, value) {
+        const element = document.getElementById(id);
+        if (element) {
+            element.value = value || "";
+        }
+    }
+
+    function getValue(id) {
+        const element = document.getElementById(id);
+        return element ? element.value.trim() : "";
+    }
+
+    async function fetchProvisionConfig() {
+        try {
+            setProvisionStatus("carregando", "secondary");
+            const response = await fetch("/cgi-bin/jupiter-config");
+            const res = await response.json();
+
+            if (res.status !== "Success" || !res.data) {
+                setProvisionStatus("erro", "danger");
+                return;
+            }
+
+            const data = res.data;
+            setValue("provision-device-id", data.device_id);
+            setValue("provision-client", data.client);
+            setValue("provision-location", data.location);
+            setValue("provision-site-id", data.site_id);
+            setValue("provision-site-name", data.site_name);
+            setValue("provision-city", data.city);
+            setValue("provision-state", data.state);
+            setValue("provision-fw-version", data.fw_version);
+            setValue("provision-mqtt-host", data.mqtt_host);
+            setValue("provision-mqtt-port", data.mqtt_port || "1883");
+            setValue("provision-mqtt-username", data.mqtt_username || data.device_id);
+            setValue("provision-mqtt-client-id", data.mqtt_client_id || data.device_id);
+            setValue("provision-mqtt-password", "");
+
+            setProvisionStatus(data.has_mqtt_secret ? "sincronizado" : "sem secret", data.has_mqtt_secret ? "success" : "warning");
+        } catch (error) {
+            console.error("Erro ao carregar provisionamento:", error);
+            setProvisionStatus("erro", "danger");
+        }
+    }
+
+    async function saveProvisionConfig() {
+        const deviceId = getValue("provision-device-id");
+        const username = getValue("provision-mqtt-username") || deviceId;
+        const clientId = getValue("provision-mqtt-client-id") || deviceId;
+        const mqttPort = Number(getValue("provision-mqtt-port") || 1883);
+
+        if (!/^[A-Za-z0-9._-]+$/.test(deviceId)) {
+            alert("Device ID inválido. Use letras, números, ponto, underline ou hífen.");
+            return;
+        }
+
+        if (username !== deviceId) {
+            alert("O usuário MQTT precisa ser igual ao Device ID autorizado na ACL.");
+            return;
+        }
+
+        if (!Number.isInteger(mqttPort) || mqttPort < 1 || mqttPort > 65535) {
+            alert("Porta MQTT inválida.");
+            return;
+        }
+
+        const payload = {
+            device_id: deviceId,
+            client: getValue("provision-client"),
+            location: getValue("provision-location"),
+            site_id: getValue("provision-site-id"),
+            site_name: getValue("provision-site-name"),
+            city: getValue("provision-city"),
+            state: getValue("provision-state").toUpperCase(),
+            fw_version: getValue("provision-fw-version") || "0.0.1",
+            mqtt_host: getValue("provision-mqtt-host"),
+            mqtt_port: mqttPort,
+            mqtt_username: username,
+            mqtt_client_id: clientId,
+            mqtt_password: getValue("provision-mqtt-password")
+        };
+
+        try {
+            setProvisionStatus("salvando", "warning");
+            const response = await fetch("/cgi-bin/jupiter-config", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload)
+            });
+            const res = await response.json();
+
+            if (res.status === "Success") {
+                setProvisionStatus("salvo", "success");
+                await fetchProvisionConfig();
+                await fetchNavbarInfo();
+            } else {
+                setProvisionStatus("erro", "danger");
+                alert("Erro ao salvar provisionamento: " + (res.msg || "--"));
+            }
+        } catch (error) {
+            console.error("Erro ao salvar provisionamento:", error);
+            setProvisionStatus("erro", "danger");
+            alert("Erro ao salvar provisionamento");
+        }
+    }
+
     async function fetchUptime() {
 
         const response = await fetch("/cgi-bin/get-uptime");
@@ -301,6 +417,84 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
+    async function fetchVinStatus() {
+        try {
+            const response = await fetch("/cgi-bin/get-vin-status");
+            const res = await response.json();
+            const statusElement = document.getElementById("vin-status");
+            const rawElement = document.getElementById("vin-raw");
+
+            if (!statusElement || !rawElement) return;
+
+            if (res.status === "Success") {
+                const present = Boolean(res.data.vin_present);
+                statusElement.textContent = present ? "NORMAL" : "BATERIA";
+                statusElement.className = present
+                    ? "card-value mt-1 mb-0 text-success"
+                    : "card-value mt-1 mb-0 text-danger";
+                rawElement.textContent = String(res.data.raw ?? "--");
+            } else {
+                statusElement.textContent = "ERRO";
+                statusElement.className = "card-value mt-1 mb-0 text-warning";
+                rawElement.textContent = "--";
+            }
+        } catch (error) {
+            console.error("Erro ao buscar VIN:", error);
+        }
+    }
+
+    async function fetchLedState() {
+        try {
+            const response = await fetch("/cgi-bin/led-control");
+            const res = await response.json();
+            const statusElement = document.getElementById("led-status");
+
+            if (!statusElement) return;
+            statusElement.textContent = res.status === "Success" && res.data.available ? "OK" : "OFF";
+            statusElement.className = res.status === "Success" && res.data.available
+                ? "text-success font-mono"
+                : "text-warning font-mono";
+        } catch (error) {
+            console.error("Erro ao buscar LEDs:", error);
+        }
+    }
+
+    async function setLedColor(color) {
+        const ledSelect = document.getElementById("led-select");
+        const led = ledSelect ? ledSelect.value : "0";
+        const statusElement = document.getElementById("led-status");
+
+        try {
+            if (statusElement) {
+                statusElement.textContent = "...";
+                statusElement.className = "text-warning font-mono";
+            }
+
+            const response = await fetch(`/cgi-bin/led-control?led=${encodeURIComponent(led)}&color=${encodeURIComponent(color)}`, {
+                method: "POST"
+            });
+            const res = await response.json();
+
+            if (res.status === "Success") {
+                if (statusElement) {
+                    statusElement.textContent = color.toUpperCase();
+                    statusElement.className = "text-success font-mono";
+                }
+            } else {
+                if (statusElement) {
+                    statusElement.textContent = "ERRO";
+                    statusElement.className = "text-danger font-mono";
+                }
+            }
+        } catch (error) {
+            console.error("Erro ao controlar LED:", error);
+            if (statusElement) {
+                statusElement.textContent = "ERRO";
+                statusElement.className = "text-danger font-mono";
+            }
+        }
+    }
+
     async function fetchStatusVpn() {
 
         const response = await fetch("/cgi-bin/get-status-vpn");
@@ -379,15 +573,28 @@ document.addEventListener("DOMContentLoaded", function () {
     fetchStatusVpn();
     fetchLogs();
     fetchNavbarInfo();
+    fetchProvisionConfig();
     fetchUptime();
     fetchTraffic();
     fetchCpuTemperature();
     fetchTelemetry();
     fetchRssi();
     fetchAds1015();
+    fetchVinStatus();
+    fetchLedState();
 
     window.fetchLogs = fetchLogs;
     window.setAdsCalibration = setAdsCalibration;
+
+    const provisionRefreshBtn = document.getElementById("provision-refresh-btn");
+    const provisionSaveBtn = document.getElementById("provision-save-btn");
+
+    if (provisionRefreshBtn) {
+        provisionRefreshBtn.addEventListener("click", fetchProvisionConfig);
+    }
+    if (provisionSaveBtn) {
+        provisionSaveBtn.addEventListener("click", saveProvisionConfig);
+    }
 
     // Relay Control Functions
     async function fetchRelays() {
@@ -443,10 +650,15 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 
+    document.querySelectorAll("[data-led-color]").forEach(button => {
+        button.addEventListener("click", () => setLedColor(button.dataset.ledColor));
+    });
+
     // Load initial relay state and update periodically
     fetchRelays();
     setInterval(fetchRelays, 5000);
     setInterval(fetchAds1015, 5000);
+    setInterval(fetchVinStatus, 5000);
 
     // ============ RELAY SCHEDULER FUNCTIONS ============
     
@@ -880,4 +1092,5 @@ document.addEventListener("DOMContentLoaded", function () {
     setInterval(fetchCpuTemperature, 10000);
     setInterval(fetchTelemetry, 10000);
     setInterval(fetchRssi, 10000);
+    setInterval(fetchLedState, 10000);
 });

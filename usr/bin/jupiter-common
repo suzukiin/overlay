@@ -1,10 +1,10 @@
 #!/bin/sh
 
-JUPITER_ETC="/etc/jupiter"
-JUPITER_RUN="/var/run/jupiter"
-JUPITER_STATE="/var/lib/jupiter/state"
-JUPITER_CACHE="/var/lib/jupiter/cache"
-JUPITER_LOG_DIR="/var/log/jupiter"
+JUPITER_ETC="${JUPITER_ETC:-/etc/jupiter}"
+JUPITER_RUN="${JUPITER_RUN:-/var/run/jupiter}"
+JUPITER_STATE="${JUPITER_STATE:-/var/lib/jupiter/state}"
+JUPITER_CACHE="${JUPITER_CACHE:-/var/lib/jupiter/cache}"
+JUPITER_LOG_DIR="${JUPITER_LOG_DIR:-/var/log/jupiter}"
 
 jupiter_mkdirs() {
     mkdir -p "$JUPITER_RUN" "$JUPITER_STATE" "$JUPITER_CACHE" "$JUPITER_LOG_DIR"

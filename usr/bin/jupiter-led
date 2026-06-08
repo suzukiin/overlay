@@ -1,0 +1,241 @@
+#!/bin/sh
+
+COMMON="${JUPITER_COMMON:-/usr/bin/jupiter-common}"
+if [ ! -f "$COMMON" ]; then
+    COMMON="$(dirname "$0")/jupiter-common"
+fi
+
+. "$COMMON"
+
+LED_DEV="${JUPITER_LED_DEV:-/dev/jupiter_leds}"
+STATE_FILE="${JUPITER_LED_STATE:-$JUPITER_STATE/leds_state}"
+LED_COUNT=6
+
+map_led() {
+    case "$1" in
+        0) echo 0 ;;
+        1) echo 1 ;;
+        2) echo 2 ;;
+        3) echo 5 ;;
+        4) echo 4 ;;
+        5) echo 3 ;;
+        *) echo -1 ;;
+    esac
+}
+
+color_rgbw() {
+    case "$1" in
+        off)     echo "00 00 00 00" ;;
+        red)     echo "ff 00 00 00" ;;
+        green)   echo "00 ff 00 00" ;;
+        blue)    echo "00 00 ff 00" ;;
+        yellow)  echo "ff ff 00 00" ;;
+        magenta) echo "ff 00 ff 00" ;;
+        cyan)    echo "00 ff ff 00" ;;
+        white)   echo "ff ff ff 00" ;;
+        orange)  echo "ff 40 00 00" ;;
+        *)       echo "" ;;
+    esac
+}
+
+empty_state() {
+    echo "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"
+}
+
+ensure_device() {
+    [ -e "$LED_DEV" ] && return 0
+    jupiter_log led "device missing path=$LED_DEV"
+    echo "Erro: $LED_DEV nao existe" >&2
+    return 1
+}
+
+init_state() {
+    jupiter_mkdirs
+    [ -f "$STATE_FILE" ] || empty_state > "$STATE_FILE"
+}
+
+write_state() {
+    local escaped=""
+    local byte
+
+    ensure_device || return 1
+
+    for byte in $(cat "$STATE_FILE"); do
+        escaped="${escaped}\\x${byte}"
+    done
+
+    printf "%b" "$escaped" > "$LED_DEV"
+}
+
+set_physical_led_in_state() {
+    local phys="$1"
+    local led_color_hex="$2"
+    local tmp=""
+    local index=0
+    local physical
+    local start
+    local current
+
+    for physical in 0 1 2 3 4 5; do
+        if [ "$physical" = "$phys" ]; then
+            tmp="$tmp $led_color_hex"
+        else
+            start=$((index * 4 + 1))
+            current="$(cut -d' ' -f"$start-$((start + 3))" "$STATE_FILE")"
+            tmp="$tmp $current"
+        fi
+        index=$((index + 1))
+    done
+
+    echo "$tmp" | sed 's/^ //' > "$STATE_FILE"
+}
+
+off() {
+    init_state
+    empty_state > "$STATE_FILE"
+    write_state
+}
+
+all_color() {
+    local color
+    color="$(color_rgbw "$1")"
+
+    [ -n "$color" ] || {
+        echo "Cor invalida: $1" >&2
+        return 1
+    }
+
+    init_state
+    echo "$color $color $color $color $color $color" > "$STATE_FILE"
+    write_state
+}
+
+set_led() {
+    local led="$1"
+    local color_name="$2"
+    local physical
+    local color
+
+    physical="$(map_led "$led")"
+    color="$(color_rgbw "$color_name")"
+
+    [ "$physical" != "-1" ] || {
+        echo "LED invalido. Use 0 a 5." >&2
+        return 1
+    }
+
+    [ -n "$color" ] || {
+        echo "Cor invalida: $color_name" >&2
+        return 1
+    }
+
+    init_state
+    set_physical_led_in_state "$physical" "$color"
+    write_state
+}
+
+status_colors() {
+    local visual=0
+    local physical
+    local color
+    local c
+    local p0="00 00 00 00"
+    local p1="00 00 00 00"
+    local p2="00 00 00 00"
+    local p3="00 00 00 00"
+    local p4="00 00 00 00"
+    local p5="00 00 00 00"
+
+    [ "$#" -eq "$LED_COUNT" ] || {
+        echo "Uso: jupiter-led status <cor0> <cor1> <cor2> <cor3> <cor4> <cor5>" >&2
+        return 1
+    }
+
+    for color in "$@"; do
+        c="$(color_rgbw "$color")"
+        [ -n "$c" ] || {
+            echo "Cor invalida: $color" >&2
+            return 1
+        }
+
+        physical="$(map_led "$visual")"
+        case "$physical" in
+            0) p0="$c" ;;
+            1) p1="$c" ;;
+            2) p2="$c" ;;
+            3) p3="$c" ;;
+            4) p4="$c" ;;
+            5) p5="$c" ;;
+        esac
+        visual=$((visual + 1))
+    done
+
+    init_state
+    echo "$p0 $p1 $p2 $p3 $p4 $p5" > "$STATE_FILE"
+    write_state
+}
+
+bounce() {
+    local color="${1:-red}"
+    local delay="${2:-0.08}"
+    local led
+
+    while true; do
+        for led in 0 1 2 3 4 5; do
+            off
+            set_led "$led" "$color"
+            sleep "$delay"
+        done
+
+        for led in 4 3 2 1; do
+            off
+            set_led "$led" "$color"
+            sleep "$delay"
+        done
+    done
+}
+
+show_state() {
+    init_state
+    printf '{"status":"Success","data":{"device":"%s","state":"%s"}}\n' "$LED_DEV" "$(cat "$STATE_FILE")"
+}
+
+usage() {
+    echo "Uso:"
+    echo "  jupiter-led off"
+    echo "  jupiter-led all <cor>"
+    echo "  jupiter-led set <led 0-5> <cor>"
+    echo "  jupiter-led status <cor0> <cor1> <cor2> <cor3> <cor4> <cor5>"
+    echo "  jupiter-led bounce [cor] [delay]"
+    echo "  jupiter-led state"
+    echo ""
+    echo "Cores: off red green blue yellow magenta cyan white orange"
+}
+
+case "$1" in
+    off)
+        off
+        ;;
+    all)
+        [ -n "$2" ] || { usage; exit 1; }
+        all_color "$2"
+        ;;
+    set)
+        [ -n "$2" ] && [ -n "$3" ] || { usage; exit 1; }
+        set_led "$2" "$3"
+        ;;
+    status)
+        shift
+        status_colors "$@"
+        ;;
+    bounce)
+        bounce "$2" "$3"
+        ;;
+    state)
+        show_state
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac

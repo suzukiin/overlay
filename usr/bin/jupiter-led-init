@@ -1,0 +1,40 @@
+#!/bin/sh
+
+COMMON="${JUPITER_COMMON:-/usr/bin/jupiter-common}"
+if [ ! -f "$COMMON" ]; then
+    COMMON="$(dirname "$0")/jupiter-common"
+fi
+
+. "$COMMON"
+
+LED_DEV="${JUPITER_LED_DEV:-/dev/jupiter_leds}"
+LED_MODULE="${JUPITER_LED_MODULE:-ws2812-pio-rp1}"
+BOOT_LED="${JUPITER_BOOT_LED:-5}"
+BOOT_COLOR="${JUPITER_BOOT_COLOR:-cyan}"
+
+load_module_once() {
+    if [ -e "$LED_DEV" ]; then
+        return 0
+    fi
+
+    rmmod ws2812_pio_rp1 2>/dev/null || true
+    rmmod "$LED_MODULE" 2>/dev/null || true
+    modprobe "$LED_MODULE" 2>/dev/null || true
+}
+
+jupiter_mkdirs
+
+for _ in 1 2 3 4 5; do
+    [ -e "$LED_DEV" ] && break
+    load_module_once
+    sleep 1
+done
+
+if [ -e "$LED_DEV" ]; then
+    /usr/bin/jupiter-led set "$BOOT_LED" "$BOOT_COLOR" || true
+    jupiter_log led "initialized device=$LED_DEV boot_led=$BOOT_LED color=$BOOT_COLOR"
+    exit 0
+fi
+
+jupiter_log led "device not found path=$LED_DEV module=$LED_MODULE"
+exit 1

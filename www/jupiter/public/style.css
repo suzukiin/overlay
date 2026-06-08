@@ -286,6 +286,47 @@ h1.h2 {
     box-shadow: 0 0 8px rgba(255, 111, 0, 0.3);
 }
 
+/* LED Controls */
+.led-color-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(24px, 1fr));
+    gap: 8px;
+}
+
+.led-swatch {
+    width: 100%;
+    aspect-ratio: 1;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.led-swatch:hover {
+    transform: translateY(-1px);
+    border-color: rgba(255, 255, 255, 0.45);
+}
+
+.led-red { background: #ef4444; }
+.led-green { background: #22c55e; }
+.led-blue { background: #3b82f6; }
+.led-yellow { background: #eab308; }
+.led-cyan { background: #06b6d4; }
+.led-white { background: #f8fafc; }
+.led-off {
+    background: #111827;
+    position: relative;
+}
+
+.led-off::after {
+    content: "";
+    position: absolute;
+    inset: 45% 18%;
+    height: 2px;
+    background: #ef4444;
+    transform: rotate(-35deg);
+}
+
 /* ADS1015 Analog Inputs */
 .ads1015-channels {
     display: flex;
@@ -455,6 +496,25 @@ h1.h2 {
     box-shadow: 0 0 10px rgba(255, 111, 0, 0.3);
 }
 
+/* Local Provisioning */
+.provision-panel {
+    background: var(--jupiter-glass);
+    border: 1px solid var(--jupiter-border);
+    border-radius: 8px;
+    padding: 18px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.provision-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.provision-password {
+    grid-column: span 2;
+}
+
 .modal-content {
     background-color: var(--jupiter-panel) !important;
 }
@@ -474,6 +534,14 @@ h1.h2 {
 }
 
 @media (max-width: 768px) {
+    .provision-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .provision-password {
+        grid-column: span 1;
+    }
+
     .scheduler-toolbar {
         align-items: flex-start;
         flex-direction: column;
