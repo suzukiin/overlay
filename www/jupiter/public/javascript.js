@@ -81,24 +81,44 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     async function fetchLogs() {
-        const response = await fetch("/cgi-bin/get-log-watchdog");
+        const response = await fetch("/cgi-bin/get-log-watchdog?limit=60");
         const res = await response.json();
 
         if (res.status == "Success") {
             const logsBody = document.getElementById("logs-body");
+            const logsSummary = document.getElementById("logs-summary");
             logsBody.innerHTML = "";
 
-            res.logs.forEach(logLine => {
+            const groupedLogs = [];
+            (res.logs || []).forEach(logLine => {
                 const parts = logLine.split(" - ");
                 const timestamp = parts[0] || "--";
                 const message = parts[1] || logLine;
+                const last = groupedLogs[groupedLogs.length - 1];
+
+                if (last && last.message === message) {
+                    last.count += 1;
+                    last.timestamp = timestamp;
+                } else {
+                    groupedLogs.push({ timestamp, message, count: 1 });
+                }
+            });
+
+            if (logsSummary) {
+                logsSummary.textContent = `${res.shown || 0}/${res.total || 0} linhas`;
+            }
+
+            groupedLogs.slice(-30).forEach(log => {
+                const countBadge = log.count > 1
+                    ? `<span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 ms-2">x${log.count}</span>`
+                    : "";
 
                 const tr = document.createElement("tr");
                 tr.innerHTML = `
-                    <td class="font-mono small">${timestamp}</td>
+                    <td class="font-mono small">${log.timestamp}</td>
                     <td><span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 small">INFO</span></td>
                     <td class="text-muted small">WATCHDOG</td>
-                    <td class="text-light small">${message}</td>
+                    <td class="text-light small">${log.message}${countBadge}</td>
                 `;
                 logsBody.appendChild(tr);
             });

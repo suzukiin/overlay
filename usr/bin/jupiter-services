@@ -6,6 +6,7 @@ SCHEDULER_PID="$JUPITER_RUN/relay-scheduler.pid"
 WEB_PID="$JUPITER_RUN/web.pid"
 VIN_MONITOR_PID="$JUPITER_RUN/vin-monitor.pid"
 MONITOR_PID="$JUPITER_RUN/monitor.pid"
+STATUS_LEDS_PID="$JUPITER_RUN/status-leds.pid"
 
 start_pid_service() {
     local name="$1"
@@ -60,6 +61,14 @@ start_vin_monitor() {
     fi
 }
 
+start_status_leds() {
+    if [ -e /dev/jupiter_leds ]; then
+        start_pid_service status-leds "$STATUS_LEDS_PID" /usr/bin/jupiter-status-leds
+    else
+        jupiter_log status-leds "not started; missing led device"
+    fi
+}
+
 stop_scheduler() {
     stop_pid_service relay-scheduler "$SCHEDULER_PID"
 }
@@ -70,6 +79,10 @@ stop_web() {
 
 stop_vin_monitor() {
     stop_pid_service vin-monitor "$VIN_MONITOR_PID"
+}
+
+stop_status_leds() {
+    stop_pid_service status-leds "$STATUS_LEDS_PID"
 }
 
 start_services() {
@@ -87,9 +100,11 @@ start_services() {
     start_monitor
     start_scheduler
     start_vin_monitor
+    start_status_leds
 }
 
 stop_services() {
+    stop_status_leds
     stop_vin_monitor
     stop_web
     stop_pid_service monitor "$MONITOR_PID"

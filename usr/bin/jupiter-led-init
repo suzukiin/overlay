@@ -9,8 +9,11 @@ fi
 
 LED_DEV="${JUPITER_LED_DEV:-/dev/jupiter_leds}"
 LED_MODULE="${JUPITER_LED_MODULE:-ws2812-pio-rp1}"
-BOOT_LED="${JUPITER_BOOT_LED:-5}"
-BOOT_COLOR="${JUPITER_BOOT_COLOR:-cyan}"
+BOOT_LED="${JUPITER_BOOT_LED:-0}"
+BOOT_COLOR="${JUPITER_BOOT_COLOR:-blue}"
+BOOT_TEST="${JUPITER_BOOT_LED_TEST:-1}"
+BOOT_TEST_COLOR="${JUPITER_BOOT_LED_TEST_COLOR:-white}"
+BOOT_TEST_DELAY="${JUPITER_BOOT_LED_TEST_DELAY:-0.15}"
 
 load_module_once() {
     if [ -e "$LED_DEV" ]; then
@@ -22,6 +25,20 @@ load_module_once() {
     modprobe "$LED_MODULE" 2>/dev/null || true
 }
 
+boot_test_sequence() {
+    local led
+
+    [ "$BOOT_TEST" = "1" ] || return 0
+
+    for led in 0 1 2 3 4 5; do
+        /usr/bin/jupiter-led off || return 1
+        /usr/bin/jupiter-led set "$led" "$BOOT_TEST_COLOR" || return 1
+        sleep "$BOOT_TEST_DELAY"
+    done
+
+    /usr/bin/jupiter-led off || true
+}
+
 jupiter_mkdirs
 
 for _ in 1 2 3 4 5; do
@@ -31,6 +48,7 @@ for _ in 1 2 3 4 5; do
 done
 
 if [ -e "$LED_DEV" ]; then
+    boot_test_sequence || true
     /usr/bin/jupiter-led set "$BOOT_LED" "$BOOT_COLOR" || true
     jupiter_log led "initialized device=$LED_DEV boot_led=$BOOT_LED color=$BOOT_COLOR"
     exit 0

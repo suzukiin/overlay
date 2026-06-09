@@ -11,6 +11,7 @@ MONITOR_BIN="${JUPITER_MONITOR_BIN:-/home/proc/monitor}"
 CONFIG_FILE="${1:-/etc/jupiter/mqtt.json}"
 NETWORK_WAIT="${JUPITER_MONITOR_NETWORK_WAIT:-120}"
 RESTART_DELAY="${JUPITER_MONITOR_RESTART_DELAY:-10}"
+MONITOR_LOG="${JUPITER_MONITOR_LOG:-$JUPITER_LOG_DIR/monitor.log}"
 child_pid=""
 
 json_get_string() {
@@ -85,10 +86,12 @@ if [ ! -x "$MONITOR_BIN" ]; then
     exit 1
 fi
 
+jupiter_mkdirs
+
 while true; do
     wait_for_broker
 
-    "$MONITOR_BIN" "$@" &
+    "$MONITOR_BIN" "$@" >> "$MONITOR_LOG" 2>&1 &
     child_pid="$!"
     wait "$child_pid"
     rc="$?"

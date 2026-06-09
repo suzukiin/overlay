@@ -8,10 +8,7 @@ fi
 . "$COMMON"
 
 VIN_STATUS_FILE="${JUPITER_VIN_STATUS_FILE:-/dev/vin_status}"
-VIN_LED="${JUPITER_VIN_LED:-0}"
 VIN_PRESENT_VALUE="${JUPITER_VIN_PRESENT_VALUE:-0}"
-VIN_PRESENT_COLOR="${JUPITER_VIN_PRESENT_COLOR:-green}"
-VIN_MISSING_COLOR="${JUPITER_VIN_MISSING_COLOR:-red}"
 VIN_GPIOCHIP="${JUPITER_VIN_GPIOCHIP:-gpiochip0}"
 VIN_GPIO_LINE="${JUPITER_VIN_GPIO_LINE:-6}"
 CHECK_INTERVAL="${JUPITER_VIN_INTERVAL:-1}"
@@ -23,7 +20,7 @@ if [ ! -e "$VIN_STATUS_FILE" ] && ! command -v gpioget >/dev/null 2>&1; then
     exit 1
 fi
 
-jupiter_log vin-monitor "started status_file=$VIN_STATUS_FILE led=$VIN_LED"
+jupiter_log vin-monitor "started status_file=$VIN_STATUS_FILE"
 
 read_vin_status() {
     local value
@@ -47,11 +44,9 @@ while true; do
 
     if [ "$value" != "$LAST_VALUE" ]; then
         if [ "$value" = "$VIN_PRESENT_VALUE" ]; then
-            /usr/bin/jupiter-led set "$VIN_LED" "$VIN_PRESENT_COLOR" || true
-            jupiter_log vin-monitor "vin present value=$value led=$VIN_LED color=$VIN_PRESENT_COLOR"
+            jupiter_log vin-monitor "vin present value=$value"
         else
-            /usr/bin/jupiter-led set "$VIN_LED" "$VIN_MISSING_COLOR" || true
-            jupiter_log vin-monitor "vin missing value=$value led=$VIN_LED color=$VIN_MISSING_COLOR"
+            jupiter_log vin-monitor "vin missing value=$value"
         fi
         LAST_VALUE="$value"
     fi

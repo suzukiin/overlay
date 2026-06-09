@@ -4,7 +4,6 @@ const fs = require("fs");
 const fsp = require("fs/promises");
 const path = require("path");
 const os = require("os");
-const net = require("net");
 const { execFile } = require("child_process");
 const express = require("express");
 const { engine } = require("express-handlebars");
@@ -184,34 +183,17 @@ app.get(["/cgi-bin/get-temp-cpu", "/api/temp-cpu"], async (req, res) => {
 
 app.get(["/cgi-bin/get-log-watchdog", "/api/log-watchdog"], async (req, res) => {
   const file = await exists(paths.watchdogLog) ? paths.watchdogLog : paths.systemLog;
+  const limit = Math.max(10, Math.min(numberOr(req.query.limit, 60), 200));
   try {
     const lines = (await readText(file)).split(/\r?\n/).filter(Boolean);
-    res.json({ status: "Success", logs: lines });
+    res.json({
+      status: "Success",
+      total: lines.length,
+      shown: Math.min(lines.length, limit),
+      logs: lines.slice(-limit)
+    });
   } catch {
     res.json(error("Nao foi possivel abrir o log"));
-  }
-});
-
-function checkInternet() {
-  return new Promise((resolve) => {
-    const socket = net.createConnection({ host: "8.8.8.8", port: 53, timeout: 2000 });
-    socket.once("connect", () => {
-      socket.destroy();
-      resolve(true);
-    });
-    socket.once("timeout", () => {
-      socket.destroy();
-      resolve(false);
-    });
-    socket.once("error", () => resolve(false));
-  });
-}
-
-app.get(["/cgi-bin/get-status-vpn", "/api/status-vpn"], async (req, res) => {
-  if (await checkInternet()) {
-    res.json({ status: "Success", internet: "online" });
-  } else {
-    res.json({ status: "Error", internet: "offline" });
   }
 });
 
@@ -230,6 +212,42 @@ function execProgram(file, args = [], options = {}) {
     });
   });
 }
+
+async function checkVpn() {
+  const iface = process.env.JUPITER_VPN_INTERFACE || "wg0";
+  const maxAge = Number(process.env.JUPITER_VPN_HANDSHAKE_MAX_AGE || 180);
+  const probeHost = process.env.JUPITER_VPN_PROBE_HOST || "10.100.1.1";
+  const now = Math.floor(Date.now() / 1000);
+  const wg = await execProgram("wg", ["show", iface, "latest-handshakes"], { timeout: 1000 });
+
+  if (!wg.err) {
+    const latest = wg.stdout
+      .split(/\r?\n/)
+      .map((line) => Number(line.trim().split(/\s+/)[1]))
+      .filter((value) => Number.isFinite(value) && value > 0)
+      .sort((a, b) => b - a)[0];
+
+    if (latest && now - latest <= maxAge) {
+      return { ok: true, method: "handshake", latest_handshake_age: now - latest };
+    }
+  }
+
+  const ping = await execProgram("ping", ["-I", iface, "-c", "1", "-W", "2", probeHost], { timeout: 3000 });
+  if (!ping.err) {
+    return { ok: true, method: "ping", probe: probeHost };
+  }
+
+  return { ok: false, method: "none", probe: probeHost };
+}
+
+app.get(["/cgi-bin/get-status-vpn", "/api/status-vpn"], async (req, res) => {
+  const vpn = await checkVpn();
+  if (vpn.ok) {
+    res.json({ status: "Success", vpn: "online", data: vpn });
+  } else {
+    res.json({ status: "Error", vpn: "offline", data: vpn });
+  }
+});
 
 function parseCgiJson(output) {
   const start = output.indexOf("{");

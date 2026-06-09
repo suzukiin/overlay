@@ -13,12 +13,12 @@ LED_COUNT=6
 
 map_led() {
     case "$1" in
-        0) echo 0 ;;
-        1) echo 1 ;;
-        2) echo 2 ;;
-        3) echo 5 ;;
-        4) echo 4 ;;
-        5) echo 3 ;;
+        0) echo 3 ;;
+        1) echo 4 ;;
+        2) echo 5 ;;
+        3) echo 2 ;;
+        4) echo 1 ;;
+        5) echo 0 ;;
         *) echo -1 ;;
     esac
 }
