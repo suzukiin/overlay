@@ -40,8 +40,7 @@ host_reachable() {
     [ -n "$port" ] || port=1883
 
     if command -v nc >/dev/null 2>&1; then
-        nc -z -w 3 "$host" "$port" >/dev/null 2>&1
-        return $?
+        nc -z -w 3 "$host" "$port" >/dev/null 2>&1 && return 0
     fi
 
     if command -v ping >/dev/null 2>&1; then
@@ -152,6 +151,7 @@ rssi_colors() {
 
 jupiter_mkdirs
 jupiter_log status-leds "started interval=${CHECK_INTERVAL}s"
+LAST_ERROR_SUMMARY=""
 
 while true; do
     rssi="$(read_rssi)"
@@ -164,7 +164,20 @@ while true; do
     vpn_ok && vpn_color="green"
 
     error_color="green"
-    internet_ok && mqtt_ok && vin_ok || error_color="red"
+    error_summary=""
+    internet_ok || error_summary="${error_summary} internet"
+    mqtt_ok || error_summary="${error_summary} mqtt"
+    vin_ok || error_summary="${error_summary} vin"
+    if [ -n "$error_summary" ]; then
+        error_color="red"
+        if [ "$error_summary" != "$LAST_ERROR_SUMMARY" ]; then
+            jupiter_log status-leds "status error:$error_summary"
+            LAST_ERROR_SUMMARY="$error_summary"
+        fi
+    elif [ -n "$LAST_ERROR_SUMMARY" ]; then
+        jupiter_log status-leds "status ok"
+        LAST_ERROR_SUMMARY=""
+    fi
 
     /usr/bin/jupiter-led status blue "$vpn_color" "$rssi1" "$rssi2" "$rssi3" "$error_color" || true
     sleep "$CHECK_INTERVAL"
