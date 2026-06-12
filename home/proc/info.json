@@ -1,8 +1,8 @@
 {
     "location": "Curitiba-PR",
     "client": "6",
-    "deviceId": "JUP104260002",
-    "wanIp": "10.100.0.14",
+    "deviceId": "JUP104260001",
+    "wanIp": "10.100.0.18",
     "lanIp": "192.168.1.100",
     "version": "0.0.1",
     "siteId": 2,
