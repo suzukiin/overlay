@@ -49,7 +49,7 @@ start_web() {
 }
 
 start_monitor() {
-    start_pid_service monitor "$MONITOR_PID" /usr/bin/jupiter-monitor /etc/jupiter/mqtt.json
+    start_pid_service monitor "$MONITOR_PID" /usr/bin/jupiter-monitor /home/proc/mqtt.json
 }
 
 start_vin_monitor() {
@@ -90,8 +90,8 @@ start_services() {
 
     /usr/bin/jupiter-config-check >/dev/null 2>&1 || jupiter_log services "configuration check failed; starting services with current files"
 
-    if [ -f /etc/jupiter/secrets.env ]; then
-        . /etc/jupiter/secrets.env
+    if [ -f /home/proc/secrets.env ]; then
+        . /home/proc/secrets.env
         export JUPITER_MQTT_PASSWORD
     fi
 

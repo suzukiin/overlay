@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "device_id": "JUP206260005",
+  "serial_number": "JUP206260005",
+  "model": "jupiter-telemetry",
+  "hardware_revision": "rev-a",
+  "firmware_version": "0.0.1",
+  "provisioning": {
+    "mode": "factory",
+    "status": "provisioned"
+  }
+}

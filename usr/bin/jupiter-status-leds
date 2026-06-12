@@ -7,7 +7,7 @@ fi
 
 . "$COMMON"
 
-CONFIG_FILE="${JUPITER_MQTT_CONFIG:-/etc/jupiter/mqtt.json}"
+CONFIG_FILE="${JUPITER_MQTT_CONFIG:-/home/proc/mqtt.json}"
 MONITOR_PID="${JUPITER_MONITOR_PID:-/var/run/jupiter/monitor.pid}"
 MONITOR_LOG="${JUPITER_MONITOR_LOG:-/var/log/jupiter/monitor.log}"
 CHECK_INTERVAL="${JUPITER_STATUS_LED_INTERVAL:-5}"

@@ -1,0 +1,623 @@
+{
+  "site": "Curitiba/PR – AFIPE – Canal 15",
+  "cliente": "ASSOCIAÇÃO DOS FILHOS DO PAI ETERNO",
+  "equipamentos": [
+    {
+      "equipamento": "AVG050",
+      "ip": "192.168.58.11",
+      "OIDS": [
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.3.236.23.1.1.2.1.2",
+          "nome": "rsAvg050BtsSatCiCfgIoAsiOut1Enabled",
+          "topico": "AVG050_ASI1"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.3.236.23.1.1.2.2.2",
+          "nome": "rsAvg050BtsSatCiCfgIoAsiOut2Enabled",
+          "topico": "AVG050_ASI2"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.3.236.23.2.2.1.2.5",
+          "nome": "rsAvg050BtsSatCiMonSat1DemodLocked",
+          "topico": "AVG050_SAT_STATUS"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.3.236.23.2.2.1.2.8",
+          "nome": "rsAvg050BtsSatCiMonSat1DemodCnRatio",
+          "topico": "AVG050_CN"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.3.236.23.2.2.1.2.9",
+          "nome": "rsAvg050BtsSatCiMonSat1DemodRxPower",
+          "topico": "AVG050_SAT_RX"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.3.236.24.2.1.1",
+          "nome": "rsAvg050BtsIsdbtMonIsdbtRemuxStatus",
+          "topico": "AVG050_REMUX_STATUS"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.3.236.26.2.1.1",
+          "nome": "rsAvg050BtsDeviceInfoStateStatus",
+          "topico": "AVG050_DEVICE_STATUS"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.3.236.26.2.2.3.3",
+          "nome": "rsAvg050BtsDeviceInfoOverallStateEventId",
+          "topico": "AVG050_STATE_EVENT"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.3.236.26.2.4.3",
+          "nome": "rsAvg050BtsDeviceInfoFansTemperaturC",
+          "topico": "AVG050_REMUX_TEMP"
+        }
+      ]
+    },
+    {
+      "equipamento": "TCE900",
+      "ip": "192.168.57.252",
+      "OIDS": [
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.1.3.1.1",
+          "nome": "txTransStForwardPower",
+          "topico": "TCE900_POTENCIA_DIRETA"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.1.3.1.2",
+          "nome": "txTransStReflectedPower",
+          "topico": "TCE900_POTENCIA_REFLETIDA"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.1.3.1.6",
+          "nome": "txTransStPaEfficiency",
+          "topico": "TCE900_EFICIENCIA"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.1.1.1.1",
+          "nome": "txAmpStI1A.1.1.1",
+          "topico": "TCE900_CORRENTE_PA1_A1_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.1.1.1.2",
+          "nome": "txAmpStI1A.1.1.2",
+          "topico": "TCE900_CORRENTE_PA2_A1_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.1.1.1.3",
+          "nome": "txAmpStI1A.1.1.3",
+          "topico": "TCE900_CORRENTE_PA3_A1_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.1.1.1.4",
+          "nome": "txAmpStI1A.1.1.4",
+          "topico": "TCE900_CORRENTE_PA4_A1_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.1.1.1.5",
+          "nome": "txAmpStI1A.1.1.5",
+          "topico": "TCE900_CORRENTE_PA5_A1_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.1.1.1.6",
+          "nome": "txAmpStI1A.1.1.6",
+          "topico": "TCE900_CORRENTE_PA6_A1_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.2.1.1.1",
+          "nome": "txAmpStI2A.1.1.1",
+          "topico": "TCE900_CORRENTE_PA1_A2_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.2.1.1.2",
+          "nome": "txAmpStI2A.1.1.2",
+          "topico": "TCE900_CORRENTE_PA2_A2_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.2.1.1.3",
+          "nome": "txAmpStI2A.1.1.3",
+          "topico": "TCE900_CORRENTE_PA3_A2_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.2.1.1.4",
+          "nome": "txAmpStI2A.1.1.4",
+          "topico": "TCE900_CORRENTE_PA4_A2_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.2.1.1.5",
+          "nome": "txAmpStI2A.1.1.5",
+          "topico": "TCE900_CORRENTE_PA5_A2_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.2.1.1.6",
+          "nome": "txAmpStI2A.1.1.6",
+          "topico": "TCE900_CORRENTE_PA6_A2_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.3.1.1.1",
+          "nome": "txAmpStI3A.1.1.1",
+          "topico": "TCE900_CORRENTE_PA1_A3_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.3.1.1.2",
+          "nome": "txAmpStI3A.1.1.2",
+          "topico": "TCE900_CORRENTE_PA2_A3_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.3.1.1.3",
+          "nome": "txAmpStI3A.1.1.3",
+          "topico": "TCE900_CORRENTE_PA3_A3_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.3.1.1.4",
+          "nome": "txAmpStI3A.1.1.4",
+          "topico": "TCE900_CORRENTE_PA4_A3_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.3.1.1.5",
+          "nome": "txAmpStI3A.1.1.5",
+          "topico": "TCE900_CORRENTE_PA5_A3_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.3.1.1.6",
+          "nome": "txAmpStI3A.1.1.6",
+          "topico": "TCE900_CORRENTE_PA6_A3_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.4.1.1.1",
+          "nome": "txAmpStI1B.1.1.1",
+          "topico": "TCE900_CORRENTE_PA1_B1_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.4.1.1.2",
+          "nome": "txAmpStI1B.1.1.2",
+          "topico": "TCE900_CORRENTE_PA2_B1_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.4.1.1.3",
+          "nome": "txAmpStI1B.1.1.3",
+          "topico": "TCE900_CORRENTE_PA3_B1_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.4.1.1.4",
+          "nome": "txAmpStI1B.1.1.4",
+          "topico": "TCE900_CORRENTE_PA4_B1_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.4.1.1.5",
+          "nome": "txAmpStI1B.1.1.5",
+          "topico": "TCE900_CORRENTE_PA5_B1_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.4.1.1.6",
+          "nome": "txAmpStI1B.1.1.6",
+          "topico": "TCE900_CORRENTE_PA6_B1_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.5.1.1.1",
+          "nome": "txAmpStI2B.1.1.1",
+          "topico": "TCE900_CORRENTE_PA1_B2_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.5.1.1.2",
+          "nome": "txAmpStI2B.1.1.2",
+          "topico": "TCE900_CORRENTE_PA2_B2_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.5.1.1.3",
+          "nome": "txAmpStI2B.1.1.3",
+          "topico": "TCE900_CORRENTE_PA3_B2_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.5.1.1.4",
+          "nome": "txAmpStI2B.1.1.4",
+          "topico": "TCE900_CORRENTE_PA4_B2_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.5.1.1.5",
+          "nome": "txAmpStI2B.1.1.5",
+          "topico": "TCE900_CORRENTE_PA5_B2_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.5.1.1.6",
+          "nome": "txAmpStI2B.1.1.6",
+          "topico": "TCE900_CORRENTE_PA6_B2_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.6.1.1.1",
+          "nome": "txAmpStI3B.1.1.1",
+          "topico": "TCE900_CORRENTE_PA1_B3_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.6.1.1.2",
+          "nome": "txAmpStI3B.1.1.2",
+          "topico": "TCE900_CORRENTE_PA2_B3_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.6.1.1.3",
+          "nome": "txAmpStI3B.1.1.3",
+          "topico": "TCE900_CORRENTE_PA3_B3_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.6.1.1.4",
+          "nome": "txAmpStI3B.1.1.4",
+          "topico": "TCE900_CORRENTE_PA4_B3_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.6.1.1.5",
+          "nome": "txAmpStI3B.1.1.5",
+          "topico": "TCE900_CORRENTE_PA5_B3_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.6.1.1.6",
+          "nome": "txAmpStI3B.1.1.6",
+          "topico": "TCE900_CORRENTE_PA6_B3_TRANSISTOR"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.7.1.1.1",
+          "nome": "txAmpStIDrv.1.1.1",
+          "topico": "TCE900_CORRENTE_PA1_DRIVE"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.7.1.1.2",
+          "nome": "txAmpStIDrv.1.1.2",
+          "topico": "TCE900_CORRENTE_PA2_DRIVE"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.7.1.1.3",
+          "nome": "txAmpStIDrv.1.1.3",
+          "topico": "TCE900_CORRENTE_PA3_DRIVE"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.7.1.1.4",
+          "nome": "txAmpStIDrv.1.1.4",
+          "topico": "TCE900_CORRENTE_PA4_DRIVE"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.7.1.1.5",
+          "nome": "txAmpStIDrv.1.1.5",
+          "topico": "TCE900_CORRENTE_PA5_DRIVE"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.7.1.1.6",
+          "nome": "txAmpStIDrv.1.1.6",
+          "topico": "TCE900_CORRENTE_PA6_DRIVE"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.8.1.1.1",
+          "nome": "txAmpStIPre.1.1.1",
+          "topico": "TCE900_CORRENTE_PA1_PRE"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.8.1.1.2",
+          "nome": "txAmpStIPre.1.1.2",
+          "topico": "TCE900_CORRENTE_PA2_PRE"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.8.1.1.3",
+          "nome": "txAmpStIPre.1.1.3",
+          "topico": "TCE900_CORRENTE_PA3_PRE"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.8.1.1.4",
+          "nome": "txAmpStIPre.1.1.4",
+          "topico": "TCE900_CORRENTE_PA4_PRE"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.8.1.1.5",
+          "nome": "txAmpStIPre.1.1.5",
+          "topico": "TCE900_CORRENTE_PA5_PRE"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.8.1.1.6",
+          "nome": "txAmpStIPre.1.1.6",
+          "topico": "TCE900_CORRENTE_PA6_PRE"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.9.1.1.1",
+          "nome": "txAmpStPwrA.1.1.1",
+          "topico": "TCE900_TENSAO_BLOCO_A_PA1"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.9.1.1.2",
+          "nome": "txAmpStPwrA.1.1.2",
+          "topico": "TCE900_TENSAO_BLOCO_A_PA2"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.9.1.1.3",
+          "nome": "txAmpStPwrA.1.1.3",
+          "topico": "TCE900_TENSAO_BLOCO_A_PA3"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.9.1.1.4",
+          "nome": "txAmpStPwrA.1.1.4",
+          "topico": "TCE900_TENSAO_BLOCO_A_PA4"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.9.1.1.5",
+          "nome": "txAmpStPwrA.1.1.5",
+          "topico": "TCE900_TENSAO_BLOCO_A_PA5"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.9.1.1.6",
+          "nome": "txAmpStPwrA.1.1.6",
+          "topico": "TCE900_TENSAO_BLOCO_A_PA6"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.10.1.1.1",
+          "nome": "txAmpStPwrB.1.1.1",
+          "topico": "TCE900_TENSAO_BLOCO_B_PA1"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.10.1.1.2",
+          "nome": "txAmpStPwrB.1.1.2",
+          "topico": "TCE900_TENSAO_BLOCO_B_PA2"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.10.1.1.3",
+          "nome": "txAmpStPwrB.1.1.3",
+          "topico": "TCE900_TENSAO_BLOCO_B_PA3"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.10.1.1.4",
+          "nome": "txAmpStPwrB.1.1.4",
+          "topico": "TCE900_TENSAO_BLOCO_B_PA4"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.10.1.1.5",
+          "nome": "txAmpStPwrB.1.1.5",
+          "topico": "TCE900_TENSAO_BLOCO_B_PA5"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.10.1.1.6",
+          "nome": "txAmpStPwrB.1.1.6",
+          "topico": "TCE900_TENSAO_BLOCO_B_PA6"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.13.1.1.1",
+          "nome": "txAmpStVRefPwr.1.1.1",
+          "topico": "TCE900_TENSAO_GATE_PA1"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.13.1.1.2",
+          "nome": "txAmpStVRefPwr.1.1.2",
+          "topico": "TCE900_TENSAO_GATE_PA2"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.13.1.1.3",
+          "nome": "txAmpStVRefPwr.1.1.3",
+          "topico": "TCE900_TENSAO_GATE_PA3"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.13.1.1.4",
+          "nome": "txAmpStVRefPwr.1.1.4",
+          "topico": "TCE900_TENSAO_GATE_PA4"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.13.1.1.5",
+          "nome": "txAmpStVRefPwr.1.1.5",
+          "topico": "TCE900_TENSAO_GATE_PA5"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.13.1.1.6",
+          "nome": "txAmpStVRefPwr.1.1.6",
+          "topico": "TCE900_TENSAO_GATE_PA6"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.15.1.1.1",
+          "nome": "txAmpStVPlusMon.1.1.1",
+          "topico": "TCE900_50V_PSUS_PA1"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.15.1.1.2",
+          "nome": "txAmpStVPlusMon.1.1.2",
+          "topico": "TCE900_50V_PSUS_PA2"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.15.1.1.3",
+          "nome": "txAmpStVPlusMon.1.1.3",
+          "topico": "TCE900_50V_PSUS_PA3"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.15.1.1.4",
+          "nome": "txAmpStVPlusMon.1.1.4",
+          "topico": "TCE900_50V_PSUS_PA4"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.15.1.1.5",
+          "nome": "txAmpStVPlusMon.1.1.5",
+          "topico": "TCE900_50V_PSUS_PA5"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.15.1.1.6",
+          "nome": "txAmpStVPlusMon.1.1.6",
+          "topico": "TCE900_50V_PSUS_PA6"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.19.1.1.1",
+          "nome": "txAmpStV12Mon.1.1.1",
+          "topico": "TCE900_12V_AUX_PA1"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.19.1.1.2",
+          "nome": "txAmpStV12Mon.1.1.2",
+          "topico": "TCE900_12V_AUX_PA2"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.19.1.1.3",
+          "nome": "txAmpStV12Mon.1.1.3",
+          "topico": "TCE900_12V_AUX_PA3"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.19.1.1.4",
+          "nome": "txAmpStV12Mon.1.1.4",
+          "topico": "TCE900_12V_AUX_PA4"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.19.1.1.5",
+          "nome": "txAmpStV12Mon.1.1.5",
+          "topico": "TCE900_12V_AUX_PA5"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.19.1.1.6",
+          "nome": "txAmpStV12Mon.1.1.6",
+          "topico": "TCE900_12V_AUX_PA6"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.20.1.1.1",
+          "nome": "txAmpStV5Acb.1.1.1",
+          "topico": "TCE900_5V_AUX_PA1"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.20.1.1.2",
+          "nome": "txAmpStV5Acb.1.1.2",
+          "topico": "TCE900_5V_AUX_PA2"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.20.1.1.3",
+          "nome": "txAmpStV5Acb.1.1.3",
+          "topico": "TCE900_5V_AUX_PA3"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.20.1.1.4",
+          "nome": "txAmpStV5Acb.1.1.4",
+          "topico": "TCE900_5V_AUX_PA4"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.20.1.1.5",
+          "nome": "txAmpStV5Acb.1.1.5",
+          "topico": "TCE900_5V_AUX_PA5"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.20.1.1.6",
+          "nome": "txAmpStV5Acb.1.1.6",
+          "topico": "TCE900_5V_AUX_PA6"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.21.1.1.1",
+          "nome": "txAmpStV3V5.1.1.1",
+          "topico": "TCE900_3.5V_AUX_PA1"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.21.1.1.2",
+          "nome": "txAmpStV3V5.1.1.2",
+          "topico": "TCE900_3.5V_AUX_PA2"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.21.1.1.3",
+          "nome": "txAmpStV3V5.1.1.3",
+          "topico": "TCE900_3.5V_AUX_PA3"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.21.1.1.4",
+          "nome": "txAmpStV3V5.1.1.4",
+          "topico": "TCE900_3.5V_AUX_PA4"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.21.1.1.5",
+          "nome": "txAmpStV3V5.1.1.5",
+          "topico": "TCE900_3.5V_AUX_PA5"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.21.1.1.6",
+          "nome": "txAmpStV3V5.1.1.6",
+          "topico": "TCE900_3.5V_AUX_PA6"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.22.1.1.1",
+          "nome": "txAmpStTemperature.1.1.1",
+          "topico": "TCE900_TEMPERATURA_PA1"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.22.1.1.2",
+          "nome": "txAmpStTemperature.1.1.2",
+          "topico": "TCE900_TEMPERATURA_PA2"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.22.1.1.3",
+          "nome": "txAmpStTemperature.1.1.3",
+          "topico": "TCE900_TEMPERATURA_PA3"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.22.1.1.4",
+          "nome": "txAmpStTemperature.1.1.4",
+          "topico": "TCE900_TEMPERATURA_PA4"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.22.1.1.5",
+          "nome": "txAmpStTemperature.1.1.5",
+          "topico": "TCE900_TEMPERATURA_PA5"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.3.1.10.2.1.22.1.1.6",
+          "nome": "txAmpStTemperature.1.1.6",
+          "topico": "TCE900_TEMPERATURA_PA6"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.100.1.1.2.1.2",
+          "nome": "lqStInletTemperature",
+          "topico": "TCE900_TEMPERATURA_LIQUIDO"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.100.1.1.2.1.8",
+          "nome": "lqStCoolantPressure",
+          "topico": "TCE900_PRESSAO_LIQUIDO"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.100.1.1.2.1.10",
+          "nome": "lqStCoolantPressureSumState",
+          "topico": "TCE900_STATUS_PRESSAO_LIQUIDO"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.100.1.1.3.1.3.1.1",
+          "nome": "lqPStCommunicationState.1.1",
+          "topico": "TCE900_COMUNICACAO_BOMBA1"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.100.1.1.3.1.3.1.2",
+          "nome": "lqPStCommunicationState.1.2",
+          "topico": "TCE900_COMUNICACAO_BOMBA2"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.100.1.1.3.1.4.1.1",
+          "nome": "lqPStSumState.1.1",
+          "topico": "TCE900_STATUS_BOMBA1"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.100.1.1.3.1.4.1.2",
+          "nome": "lqPStSumState.1.2",
+          "topico": "TCE900_STATUS_BOMBA2"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.100.1.1.3.1.5.1.1",
+          "nome": "lqPStMotorBlocked.1.1",
+          "topico": "TCE900_STATUS_MOTOR_BOMBA1"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.100.1.1.3.1.5.1.2",
+          "nome": "lqPStMotorBlocked.1.2",
+          "topico": "TCE900_STATUS_MOTOR_BOMBA2"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.100.1.1.3.1.8.1.1",
+          "nome": "lqPStCurrentFlowRate.1.1",
+          "topico": "TCE900_VAZAO_BOMBA1"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.100.1.1.3.1.8.1.2",
+          "nome": "lqPStCurrentFlowRate.1.2",
+          "topico": "TCE900_VAZAO_BOMBA2"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.100.1.1.3.1.9.1.1",
+          "nome": "lqPStCurrentSpeed.1.1",
+          "topico": "TCE900_VELOCIDADE_ROTACAO_MOTOR_BOMBA1"
+        },
+        {
+          "oid": "1.3.6.1.4.1.2566.127.1.2.216.100.1.1.3.1.9.1.2",
+          "nome": "lqPStCurrentSpeed.1.2",
+          "topico": "TCE900_VELOCIDADE_ROTACAO_MOTOR_BOMBA2"
+        }
+      ]
+    }
+  ]
+}

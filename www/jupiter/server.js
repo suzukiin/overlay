@@ -18,9 +18,9 @@ function devicePath(absolutePath) {
 
 const paths = {
   webLog: devicePath("/var/log/jupiter/web.log"),
-  info: devicePath("/www/jupiter/config/info.json"),
-  virtualInputs: devicePath("/www/jupiter/config/virtual_inputs.json"),
-  telemetryData: devicePath("/www/jupiter/public/telemetry_data.json"),
+  info: devicePath("/home/proc/info.json"),
+  virtualInputs: devicePath("/home/proc/virtual_inputs.json"),
+  telemetryData: devicePath("/home/proc/telemetry_data.json"),
   relaySchedule: devicePath("/etc/jupiter/relay_schedule.json"),
   relayState: devicePath("/var/lib/jupiter/state/relay_state"),
   legacyRelayState: devicePath("/etc/jupiter/relay_state"),
@@ -125,6 +125,15 @@ app.get(["/cgi-bin/get-info-navbar", "/api/info-navbar"], async (req, res) => {
     return;
   }
   res.json(ok(info));
+});
+
+app.get(["/public/telemetry_data.json", "/api/telemetry-data"], async (req, res) => {
+  try {
+    await fsp.access(paths.telemetryData, fs.constants.R_OK);
+    res.sendFile(paths.telemetryData);
+  } catch {
+    res.json({ equipamentos: [] });
+  }
 });
 
 app.get(["/cgi-bin/get-uptime", "/api/uptime"], (req, res) => {

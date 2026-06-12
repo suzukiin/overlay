@@ -2,11 +2,11 @@
 
 . /usr/bin/jupiter-common
 
-DEVICE_FILE="/etc/jupiter/device.json"
-MQTT_FILE="/etc/jupiter/mqtt.json"
-INFO_FILE="/www/jupiter/config/info.json"
-INPUTS_FILE="/www/jupiter/config/virtual_inputs.json"
-SECRETS_FILE="/etc/jupiter/secrets.env"
+DEVICE_FILE="/home/proc/jupiter.json"
+MQTT_FILE="/home/proc/mqtt.json"
+INFO_FILE="/home/proc/info.json"
+INPUTS_FILE="/home/proc/virtual_inputs.json"
+SECRETS_FILE="/home/proc/secrets.env"
 
 errors=0
 warnings=0
@@ -76,7 +76,7 @@ if [ -n "$device_id" ] && [ -n "$info_device_id" ] && [ "$device_id" != "$info_d
 fi
 
 if [ -n "$mqtt_password" ]; then
-    warn "senha MQTT em texto no mqtt.json; preferir /etc/jupiter/secrets.env"
+    warn "senha MQTT em texto no mqtt.json; preferir /home/proc/secrets.env"
 fi
 
 if [ ! -f "$SECRETS_FILE" ] && [ -z "$mqtt_password" ]; then

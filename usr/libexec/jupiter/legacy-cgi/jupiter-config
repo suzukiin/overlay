@@ -1,12 +1,12 @@
 #!/bin/sh
 
 CONTENT_TYPE_JSON="Content-Type: application/json"
-DEVICE_FILE="/etc/jupiter/device.json"
-LEGACY_DEVICE_FILE="/etc/jupiter/jupiter.json"
+DEVICE_FILE="/home/proc/device.json"
+LEGACY_DEVICE_FILE="/home/proc/jupiter.json"
 FLEET_FILE="/etc/jupiter/fleet.json"
-MQTT_FILE="/etc/jupiter/mqtt.json"
-INFO_FILE="/www/jupiter/config/info.json"
-SECRETS_FILE="/etc/jupiter/secrets.env"
+MQTT_FILE="/home/proc/mqtt.json"
+INFO_FILE="/home/proc/info.json"
+SECRETS_FILE="/home/proc/secrets.env"
 
 print_json_header() {
     echo "$CONTENT_TYPE_JSON"
@@ -240,10 +240,10 @@ EOF
   "fw_version": "$(json_escape "$fw_version")",
   "snmp_community": "public",
   "polling_interval": 10,
-  "identity_file": "/etc/jupiter/device.json",
-  "info_file": "/www/jupiter/config/info.json",
-  "inputs_file": "/www/jupiter/config/virtual_inputs.json",
-  "output_file": "/www/jupiter/public/telemetry_data.json",
+  "identity_file": "/home/proc/jupiter.json",
+  "info_file": "/home/proc/info.json",
+  "inputs_file": "/home/proc/virtual_inputs.json",
+  "output_file": "/home/proc/telemetry_data.json",
   "vin_status_path": "/dev/vin_status",
   "relay_paths": [
     "/dev/relay1",
