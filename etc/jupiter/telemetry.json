@@ -1,8 +1,9 @@
 {
   "schema_version": 1,
-  "polling_interval": 10,
+  "polling_interval": 30,
   "snmp_community": "public",
-  "identity_file": "/home/proc/jupiter.json",
+  "identity_file": "/etc/jupiter/device.json",
+  "hardware_file": "/etc/jupiter/hardware.json",
   "site_info_file": "/home/proc/info.json",
   "inputs_file": "/home/proc/virtual_inputs.json",
   "output_file": "/home/proc/telemetry_data.json"

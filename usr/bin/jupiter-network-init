@@ -2,20 +2,170 @@
 
 . /usr/bin/jupiter-common
 
+NETWORK_CONFIG="/etc/jupiter/network.json"
+
+json_object_bool() {
+    file="$1"
+    object="$2"
+    key="$3"
+    [ -f "$file" ] || return 0
+    tr '\n' ' ' < "$file" \
+        | sed -n 's/.*"'"$object"'"[[:space:]]*:[[:space:]]*{[^}]*"'"$key"'"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' \
+        | head -n 1
+}
+
+json_object_string() {
+    file="$1"
+    object="$2"
+    key="$3"
+    [ -f "$file" ] || return 0
+    tr '\n' ' ' < "$file" \
+        | sed -n 's/.*"'"$object"'"[[:space:]]*:[[:space:]]*{[^}]*"'"$key"'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+        | head -n 1
+}
+
+json_object_first_array_string() {
+    file="$1"
+    object="$2"
+    key="$3"
+    [ -f "$file" ] || return 0
+    tr '\n' ' ' < "$file" \
+        | sed -n 's/.*"'"$object"'"[[:space:]]*:[[:space:]]*{[^}]*"'"$key"'"[[:space:]]*:[[:space:]]*\[[[:space:]]*"\([^"]*\)".*/\1/p' \
+        | head -n 1
+}
+
+is_true() {
+    [ "$1" = "true" ]
+}
+
+cidr_netmask() {
+    case "$1" in
+        0) echo 0.0.0.0 ;;
+        1) echo 128.0.0.0 ;;
+        2) echo 192.0.0.0 ;;
+        3) echo 224.0.0.0 ;;
+        4) echo 240.0.0.0 ;;
+        5) echo 248.0.0.0 ;;
+        6) echo 252.0.0.0 ;;
+        7) echo 254.0.0.0 ;;
+        8) echo 255.0.0.0 ;;
+        9) echo 255.128.0.0 ;;
+        10) echo 255.192.0.0 ;;
+        11) echo 255.224.0.0 ;;
+        12) echo 255.240.0.0 ;;
+        13) echo 255.248.0.0 ;;
+        14) echo 255.252.0.0 ;;
+        15) echo 255.254.0.0 ;;
+        16) echo 255.255.0.0 ;;
+        17) echo 255.255.128.0 ;;
+        18) echo 255.255.192.0 ;;
+        19) echo 255.255.224.0 ;;
+        20) echo 255.255.240.0 ;;
+        21) echo 255.255.248.0 ;;
+        22) echo 255.255.252.0 ;;
+        23) echo 255.255.254.0 ;;
+        24) echo 255.255.255.0 ;;
+        25) echo 255.255.255.128 ;;
+        26) echo 255.255.255.192 ;;
+        27) echo 255.255.255.224 ;;
+        28) echo 255.255.255.240 ;;
+        29) echo 255.255.255.248 ;;
+        30) echo 255.255.255.252 ;;
+        31) echo 255.255.255.254 ;;
+        32) echo 255.255.255.255 ;;
+        *) return 1 ;;
+    esac
+}
+
+configure_lan() {
+    local enabled iface cidr ip prefix netmask
+
+    enabled="$(json_object_bool "$NETWORK_CONFIG" lan enabled)"
+    iface="$(json_object_string "$NETWORK_CONFIG" lan interface)"
+    cidr="$(json_object_first_array_string "$NETWORK_CONFIG" lan addresses)"
+    [ -n "$iface" ] || iface="eth0"
+
+    if ! is_true "$enabled"; then
+        jupiter_log network "LAN disabled"
+        return 0
+    fi
+
+    if [ -z "$cidr" ]; then
+        jupiter_log network "LAN enabled without address"
+        return 0
+    fi
+
+    case "$cidr" in
+        */*)
+            ip="${cidr%/*}"
+            prefix="${cidr#*/}"
+            ;;
+        *)
+            jupiter_log network "invalid LAN address; expected CIDR: $cidr"
+            return 0
+            ;;
+    esac
+
+    netmask="$(cidr_netmask "$prefix")" || {
+        jupiter_log network "invalid LAN prefix: $prefix"
+        return 0
+    }
+
+    ifconfig "$iface" "$ip" netmask "$netmask"
+    jupiter_log network "LAN configured $iface $cidr"
+}
+
+configure_nat() {
+    local enabled rules_file
+
+    enabled="$(json_object_bool "$NETWORK_CONFIG" nat enabled)"
+    rules_file="$(json_object_string "$NETWORK_CONFIG" nat rules_file)"
+    [ -n "$rules_file" ] || rules_file="/etc/network/NAT/NAT.cfg"
+
+    if ! is_true "$enabled"; then
+        jupiter_log network "NAT disabled"
+        return 0
+    fi
+
+    if [ -x "$rules_file" ]; then
+        "$rules_file"
+        jupiter_log network "NAT configured with $rules_file"
+    else
+        jupiter_log network "NAT enabled but rules file is missing: $rules_file"
+    fi
+}
+
+configure_vpn() {
+    local enabled iface config_file
+
+    enabled="$(json_object_bool "$NETWORK_CONFIG" vpn enabled)"
+    iface="$(json_object_string "$NETWORK_CONFIG" vpn interface)"
+    config_file="$(json_object_string "$NETWORK_CONFIG" vpn config_file)"
+
+    if ! is_true "$enabled"; then
+        jupiter_log network "VPN disabled"
+        return 0
+    fi
+
+    if [ -z "$iface" ]; then
+        jupiter_log network "VPN enabled without interface"
+        return 0
+    fi
+
+    [ -n "$config_file" ] || config_file="/etc/wireguard/$iface.conf"
+
+    if command -v wg-quick >/dev/null 2>&1 && [ -f "$config_file" ]; then
+        wg-quick up "$iface" 2>/dev/null
+        jupiter_log network "VPN configured $iface"
+    else
+        jupiter_log network "VPN enabled but wg-quick or config is missing"
+    fi
+}
+
 jupiter_mkdirs
 
-ifconfig eth0 192.168.1.100 netmask 255.255.255.0
-
-if [ -x /etc/network/ipAddr/IP.cfg ]; then
-    /etc/network/ipAddr/IP.cfg
-fi
-
-if [ -x /etc/network/NAT/NAT.cfg ]; then
-    /etc/network/NAT/NAT.cfg
-fi
-
-if command -v wg-quick >/dev/null 2>&1 && [ -f /etc/wireguard/wg0.conf ]; then
-    wg-quick up wg0 2>/dev/null
-fi
+configure_lan
+configure_nat
+configure_vpn
 
 jupiter_log network "initialized"

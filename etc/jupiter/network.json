@@ -1,27 +1,27 @@
 {
   "schema_version": 1,
   "lan": {
+    "enabled": false,
     "interface": "eth0",
-    "addresses": [
-      "192.168.1.120/24"
-    ]
+    "addresses": []
   },
   "lte": {
-    "peer": "VIVO-PEERS",
-    "chat_file": "/etc/ppp/chat/VIVO",
-    "device": "/dev/ttyUSB2",
-    "health_targets": [
-      "8.8.8.8"
-    ],
+    "enabled": false,
+    "peer": "",
+    "chat_file": "",
+    "device": "",
+    "health_targets": [],
     "check_interval_seconds": 60,
     "startup_wait_seconds": 30
   },
   "vpn": {
-    "interface": "wg0",
-    "enabled": true
+    "interface": "",
+    "enabled": false,
+    "config_file": "",
+    "probe_host": ""
   },
   "nat": {
-    "enabled": true,
+    "enabled": false,
     "rules_file": "/etc/network/NAT/NAT.cfg"
   }
 }

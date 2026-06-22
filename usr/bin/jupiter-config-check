@@ -2,14 +2,18 @@
 
 . /usr/bin/jupiter-common
 
-DEVICE_FILE="/home/proc/jupiter.json"
+DEVICE_FILE="/etc/jupiter/device.json"
 MQTT_FILE="/home/proc/mqtt.json"
+TELEMETRY_FILE="/etc/jupiter/telemetry.json"
+HARDWARE_FILE="/etc/jupiter/hardware.json"
+NETWORK_FILE="/etc/jupiter/network.json"
 INFO_FILE="/home/proc/info.json"
 INPUTS_FILE="/home/proc/virtual_inputs.json"
 SECRETS_FILE="/home/proc/secrets.env"
 
 errors=0
 warnings=0
+mode="${1:-check}"
 
 json_get_string() {
     file="$1"
@@ -23,6 +27,26 @@ json_get_number() {
     key="$2"
     [ -f "$file" ] || return 0
     sed -n 's/.*"'$key'"[[:space:]]*:[[:space:]]*\([-0-9.][0-9.]*\).*/\1/p' "$file" | head -n 1
+}
+
+json_get_bool_in_object() {
+    file="$1"
+    object="$2"
+    key="$3"
+    [ -f "$file" ] || return 0
+    tr '\n' ' ' < "$file" \
+        | sed -n 's/.*"'"$object"'"[[:space:]]*:[[:space:]]*{[^}]*"'"$key"'"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' \
+        | head -n 1
+}
+
+json_get_string_in_object() {
+    file="$1"
+    object="$2"
+    key="$3"
+    [ -f "$file" ] || return 0
+    tr '\n' ' ' < "$file" \
+        | sed -n 's/.*"'"$object"'"[[:space:]]*:[[:space:]]*{[^}]*"'"$key"'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+        | head -n 1
 }
 
 warn() {
@@ -43,44 +67,96 @@ require_file() {
 
 require_file "$DEVICE_FILE"
 require_file "$MQTT_FILE"
+require_file "$TELEMETRY_FILE"
+require_file "$HARDWARE_FILE"
+require_file "$NETWORK_FILE"
 require_file "$INFO_FILE"
 require_file "$INPUTS_FILE"
 
 device_id="$(json_get_string "$DEVICE_FILE" device_id)"
-mqtt_device_id="$(json_get_string "$MQTT_FILE" device_id)"
-mqtt_username="$(json_get_string "$MQTT_FILE" username)"
-mqtt_client_id="$(json_get_string "$MQTT_FILE" client_id)"
+provisioning_status="$(json_get_string "$DEVICE_FILE" status)"
+firmware_version="$(json_get_string "$DEVICE_FILE" firmware_version)"
 mqtt_host="$(json_get_string "$MQTT_FILE" host)"
 mqtt_port="$(json_get_number "$MQTT_FILE" port)"
+polling_interval="$(json_get_number "$TELEMETRY_FILE" polling_interval)"
+snmp_community="$(json_get_string "$TELEMETRY_FILE" snmp_community)"
 info_device_id="$(json_get_string "$INFO_FILE" deviceId)"
 mqtt_password="$(json_get_string "$MQTT_FILE" password)"
+lte_enabled="$(json_get_bool_in_object "$NETWORK_FILE" lte enabled)"
+lte_peer="$(json_get_string_in_object "$NETWORK_FILE" lte peer)"
+lte_device="$(json_get_string_in_object "$NETWORK_FILE" lte device)"
+lte_chat_file="$(json_get_string_in_object "$NETWORK_FILE" lte chat_file)"
 
-[ -n "$device_id" ] || err "device_id vazio em $DEVICE_FILE"
-[ -n "$mqtt_host" ] || err "host MQTT vazio em $MQTT_FILE"
+monitor_ready() {
+    [ -n "$device_id" ] || return 1
+    [ -n "$mqtt_host" ] || return 1
+    [ -n "$mqtt_port" ] || return 1
+    [ -n "$JUPITER_MQTT_PASSWORD" ] || [ -f "$SECRETS_FILE" ] || [ -n "$mqtt_password" ]
+}
+
+lte_ready() {
+    [ "$lte_enabled" = "true" ] || return 1
+    [ -n "$lte_peer" ] || return 1
+    [ -n "$lte_device" ] || return 1
+    [ -f "/etc/ppp/peers/$lte_peer" ] || return 1
+    [ -z "$lte_chat_file" ] || [ -f "$lte_chat_file" ]
+}
+
+if [ "$mode" = "monitor-ready" ]; then
+    monitor_ready
+    exit $?
+fi
+
+if [ "$mode" = "lte-ready" ]; then
+    lte_ready
+    exit $?
+fi
+
+if [ "$provisioning_status" != "provisioned" ] || [ -z "$device_id" ]; then
+    unprovisioned=true
+else
+    unprovisioned=false
+fi
+
+if [ -n "$device_id" ]; then
+    :
+elif [ "$unprovisioned" = "true" ]; then
+    warn "device ainda não provisionado em $DEVICE_FILE"
+else
+    err "device_id vazio em $DEVICE_FILE"
+fi
+
+[ -n "$firmware_version" ] || warn "firmware_version vazio em $DEVICE_FILE"
+
+if [ -n "$mqtt_host" ]; then
+    :
+elif [ "$unprovisioned" = "true" ]; then
+    warn "host MQTT vazio em $MQTT_FILE; monitor ficará parado até provisionar"
+else
+    err "host MQTT vazio em $MQTT_FILE"
+fi
+
 [ -n "$mqtt_port" ] || err "porta MQTT vazia em $MQTT_FILE"
-
-if [ -n "$device_id" ] && [ -n "$mqtt_device_id" ] && [ "$device_id" != "$mqtt_device_id" ]; then
-    err "device_id divergente: device=$device_id mqtt=$mqtt_device_id"
-fi
-
-if [ -n "$device_id" ] && [ -n "$mqtt_username" ] && [ "$device_id" != "$mqtt_username" ]; then
-    err "username MQTT deve corresponder ao device_id: device=$device_id username=$mqtt_username"
-fi
-
-if [ -n "$device_id" ] && [ -n "$mqtt_client_id" ] && [ "$device_id" != "$mqtt_client_id" ]; then
-    warn "client_id MQTT diferente do device_id: device=$device_id client_id=$mqtt_client_id"
-fi
+[ -n "$polling_interval" ] || warn "polling_interval vazio em $TELEMETRY_FILE"
+[ -n "$snmp_community" ] || warn "snmp_community vazio em $TELEMETRY_FILE"
 
 if [ -n "$device_id" ] && [ -n "$info_device_id" ] && [ "$device_id" != "$info_device_id" ]; then
     warn "deviceId do dashboard divergente: device=$device_id info=$info_device_id"
 fi
 
 if [ -n "$mqtt_password" ]; then
-    warn "senha MQTT em texto no mqtt.json; preferir /home/proc/secrets.env"
+    warn "senha MQTT em texto no $MQTT_FILE; preferir /home/proc/secrets.env"
 fi
 
-if [ ! -f "$SECRETS_FILE" ] && [ -z "$mqtt_password" ]; then
+if [ "$unprovisioned" != "true" ] && [ ! -f "$SECRETS_FILE" ] && [ -z "$mqtt_password" ]; then
     warn "senha MQTT não encontrada em secrets.env nem em mqtt.json"
+fi
+
+if [ "$lte_enabled" = "true" ]; then
+    [ -n "$lte_peer" ] || warn "LTE habilitado sem peer em $NETWORK_FILE"
+    [ -n "$lte_device" ] || warn "LTE habilitado sem device em $NETWORK_FILE"
+    [ -z "$lte_peer" ] || [ -f "/etc/ppp/peers/$lte_peer" ] || warn "peer LTE ausente: /etc/ppp/peers/$lte_peer"
+    [ -z "$lte_chat_file" ] || [ -f "$lte_chat_file" ] || warn "chat LTE ausente: $lte_chat_file"
 fi
 
 if [ -f "$INPUTS_FILE" ] && ! grep -q '"equipamentos"' "$INPUTS_FILE"; then

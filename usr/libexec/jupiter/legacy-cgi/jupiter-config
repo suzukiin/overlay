@@ -1,8 +1,7 @@
 #!/bin/sh
 
 CONTENT_TYPE_JSON="Content-Type: application/json"
-DEVICE_FILE="/home/proc/device.json"
-LEGACY_DEVICE_FILE="/home/proc/jupiter.json"
+DEVICE_FILE="/etc/jupiter/device.json"
 FLEET_FILE="/etc/jupiter/fleet.json"
 MQTT_FILE="/home/proc/mqtt.json"
 INFO_FILE="/home/proc/info.json"
@@ -91,7 +90,6 @@ write_file() {
 
 show_config() {
     device_id="$(json_get_string "$DEVICE_FILE" device_id)"
-    [ -n "$device_id" ] || device_id="$(json_get_string "$MQTT_FILE" device_id)"
 
     client="$(json_get_string "$INFO_FILE" client)"
     location="$(json_get_string "$INFO_FILE" location)"
@@ -107,7 +105,9 @@ show_config() {
     mqtt_host="$(json_get_string "$MQTT_FILE" host)"
     mqtt_port="$(json_get_number "$MQTT_FILE" port)"
     mqtt_username="$(json_get_string "$MQTT_FILE" username)"
+    [ -n "$mqtt_username" ] || mqtt_username="$device_id"
     mqtt_client_id="$(json_get_string "$MQTT_FILE" client_id)"
+    [ -n "$mqtt_client_id" ] || mqtt_client_id="$device_id"
     mqtt_tls="$(json_get_string "$MQTT_FILE" tls)"
 
     print_json_header
@@ -188,16 +188,10 @@ save_config() {
 }
 EOF
 
-    write_file "$LEGACY_DEVICE_FILE" <<EOF
-{
-  "device_id": "$(json_escape "$device_id")"
-}
-EOF
-
     write_file "$FLEET_FILE" <<EOF
 {
   "schema_version": 1,
-  "tenant": "lab-service",
+  "tenant": "$(json_escape "$client")",
   "environment": "production",
   "site": {
     "id": "$(json_escape "$site_id")",
@@ -232,29 +226,7 @@ EOF
     write_file "$MQTT_FILE" <<EOF
 {
   "host": "$(json_escape "$mqtt_host")",
-  "port": $mqtt_port,
-  "device_id": "$(json_escape "$device_id")",
-  "username": "$(json_escape "$mqtt_username")",
-  "password": "",
-  "client_id": "$(json_escape "$mqtt_client_id")",
-  "fw_version": "$(json_escape "$fw_version")",
-  "snmp_community": "public",
-  "polling_interval": 10,
-  "identity_file": "/home/proc/jupiter.json",
-  "info_file": "/home/proc/info.json",
-  "inputs_file": "/home/proc/virtual_inputs.json",
-  "output_file": "/home/proc/telemetry_data.json",
-  "vin_status_path": "/dev/vin_status",
-  "relay_paths": [
-    "/dev/relay1",
-    "/dev/relay2"
-  ],
-  "analog_inputs": [
-    { "name": "analog_1", "path": "/var/lib/jupiter/iio/ads1015/in_voltage0_raw", "scale": 1.0, "offset": 0.0, "unit": "raw" },
-    { "name": "analog_2", "path": "/var/lib/jupiter/iio/ads1015/in_voltage1_raw", "scale": 1.0, "offset": 0.0, "unit": "raw" },
-    { "name": "analog_3", "path": "/var/lib/jupiter/iio/ads1015/in_voltage2_raw", "scale": 1.0, "offset": 0.0, "unit": "raw" },
-    { "name": "analog_4", "path": "/var/lib/jupiter/iio/ads1015/in_voltage3_raw", "scale": 1.0, "offset": 0.0, "unit": "raw" }
-  ]
+  "port": $mqtt_port
 }
 EOF
 

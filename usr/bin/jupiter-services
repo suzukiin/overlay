@@ -49,6 +49,12 @@ start_web() {
 }
 
 start_monitor() {
+    if ! /usr/bin/jupiter-config-check monitor-ready >/dev/null 2>&1; then
+        rm -f "$MONITOR_PID"
+        jupiter_log monitor "not started; device is not provisioned"
+        return 0
+    fi
+
     start_pid_service monitor "$MONITOR_PID" /usr/bin/jupiter-monitor /home/proc/mqtt.json
 }
 
@@ -69,6 +75,15 @@ start_status_leds() {
     fi
 }
 
+start_watchdog() {
+    if /usr/bin/jupiter-config-check lte-ready >/dev/null 2>&1; then
+        jupiter_start_once watchdog /usr/bin/jupiter-watchdog
+    else
+        pidof watchdog >/dev/null 2>&1 && jupiter_stop watchdog
+        jupiter_log watchdog "not started; LTE is not provisioned"
+    fi
+}
+
 stop_scheduler() {
     stop_pid_service relay-scheduler "$SCHEDULER_PID"
 }
@@ -85,6 +100,10 @@ stop_status_leds() {
     stop_pid_service status-leds "$STATUS_LEDS_PID"
 }
 
+stop_watchdog() {
+    jupiter_stop watchdog
+}
+
 start_services() {
     jupiter_mkdirs
 
@@ -96,7 +115,7 @@ start_services() {
     fi
 
     start_web
-    jupiter_start_once watchdog /usr/bin/jupiter-watchdog
+    start_watchdog
     start_monitor
     start_scheduler
     start_vin_monitor
@@ -108,7 +127,7 @@ stop_services() {
     stop_vin_monitor
     stop_web
     stop_pid_service monitor "$MONITOR_PID"
-    jupiter_stop watchdog
+    stop_watchdog
     stop_scheduler
 }
 

@@ -2,34 +2,117 @@
 
 . /usr/bin/jupiter-common
 
+NETWORK_CONFIG="/etc/jupiter/network.json"
 WATCHDOG_LOG_FILE="/var/log/watchdog.log"
-PEERS_DIR_FILE="/etc/ppp/peers/DATATEM-PEERS"
-PEERS="DATATEM-PEERS"
-PPPD_DIR_FILE="/etc/ppp/chat/DATATEM"
-USB_PPP="/dev/ttyUSB2"
 PWR_KEY="/dev/pwr_key"
+PPP_IFACE="${PPP_IFACE:-ppp0}"
 
 isUP=false
 
+json_object_bool() {
+    file="$1"
+    object="$2"
+    key="$3"
+    [ -f "$file" ] || return 0
+    tr '\n' ' ' < "$file" \
+        | sed -n 's/.*"'"$object"'"[[:space:]]*:[[:space:]]*{[^}]*"'"$key"'"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' \
+        | head -n 1
+}
+
+json_object_string() {
+    file="$1"
+    object="$2"
+    key="$3"
+    [ -f "$file" ] || return 0
+    tr '\n' ' ' < "$file" \
+        | sed -n 's/.*"'"$object"'"[[:space:]]*:[[:space:]]*{[^}]*"'"$key"'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+        | head -n 1
+}
+
+json_object_number() {
+    file="$1"
+    object="$2"
+    key="$3"
+    [ -f "$file" ] || return 0
+    tr '\n' ' ' < "$file" \
+        | sed -n 's/.*"'"$object"'"[[:space:]]*:[[:space:]]*{[^}]*"'"$key"'"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' \
+        | head -n 1
+}
+
+json_object_first_array_string() {
+    file="$1"
+    object="$2"
+    key="$3"
+    [ -f "$file" ] || return 0
+    tr '\n' ' ' < "$file" \
+        | sed -n 's/.*"'"$object"'"[[:space:]]*:[[:space:]]*{[^}]*"'"$key"'"[[:space:]]*:[[:space:]]*\[[[:space:]]*"\([^"]*\)".*/\1/p' \
+        | head -n 1
+}
+
 log(){
     jupiter_log watchdog "$1"
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> $WATCHDOG_LOG_FILE
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$WATCHDOG_LOG_FILE"
+}
+
+load_config() {
+    LTE_ENABLED="$(json_object_bool "$NETWORK_CONFIG" lte enabled)"
+    PEERS="$(json_object_string "$NETWORK_CONFIG" lte peer)"
+    CHAT_FILE="$(json_object_string "$NETWORK_CONFIG" lte chat_file)"
+    USB_PPP="$(json_object_string "$NETWORK_CONFIG" lte device)"
+    HEALTH_TARGET="$(json_object_first_array_string "$NETWORK_CONFIG" lte health_targets)"
+    CHECK_INTERVAL="$(json_object_number "$NETWORK_CONFIG" lte check_interval_seconds)"
+    STARTUP_WAIT="$(json_object_number "$NETWORK_CONFIG" lte startup_wait_seconds)"
+
+    case "$CHECK_INTERVAL" in
+        ""|*[!0-9]*) CHECK_INTERVAL=60 ;;
+    esac
+
+    case "$STARTUP_WAIT" in
+        ""|*[!0-9]*) STARTUP_WAIT=30 ;;
+    esac
+}
+
+validate_config() {
+    if [ "$LTE_ENABLED" != "true" ]; then
+        log "LTE disabled"
+        exit 0
+    fi
+
+    if [ -z "$PEERS" ] || [ ! -f "/etc/ppp/peers/$PEERS" ]; then
+        log "LTE peer not configured"
+        exit 0
+    fi
+
+    if [ -n "$CHAT_FILE" ] && [ ! -f "$CHAT_FILE" ]; then
+        log "LTE chat file not found: $CHAT_FILE"
+        exit 0
+    fi
+
+    if [ -z "$USB_PPP" ]; then
+        log "LTE modem device not configured"
+        exit 0
+    fi
+
+    if [ -z "$HEALTH_TARGET" ]; then
+        log "LTE health target not configured"
+        exit 0
+    fi
 }
 
 watchdog(){
 
     if [ "$isUP" = "false" ]; then
-        pppd call $PEERS &
+        pppd call "$PEERS" &
         log "Iniciando conexao LTE..."
 
-        sleep 30
+        sleep "$STARTUP_WAIT"
 
-        if ifconfig | grep ppp0 > /dev/null; then
-            ping 8.8.8.8 -c 1 -I ppp0 > /dev/null 2>&1
+        if ifconfig "$PPP_IFACE" > /dev/null 2>&1; then
+            ping "$HEALTH_TARGET" -c 1 -I "$PPP_IFACE" > /dev/null 2>&1
             if [ $? -ne 0 ]; then
                 isUP=false
                 log "Falha ao estabelecer conexao LTE, tentando novamente..."
-                ifconfig ppp0 down 2>/dev/null
+                ifconfig "$PPP_IFACE" down 2>/dev/null
                 reset_modem
                 return
             fi
@@ -43,14 +126,14 @@ watchdog(){
             return
         fi
     else
-        if ifconfig | grep ppp0 > /dev/null; then
-            ping 8.8.8.8 -c 1 -I ppp0 > /dev/null 2>&1
+        if ifconfig "$PPP_IFACE" > /dev/null 2>&1; then
+            ping "$HEALTH_TARGET" -c 1 -I "$PPP_IFACE" > /dev/null 2>&1
             if [ $? -eq 0 ]; then
                 return
             else
                 isUP=false
                 log "Conexão perdida, reiniciando conexão LTE..."
-                ifconfig ppp0 down 2>/dev/null
+                ifconfig "$PPP_IFACE" down 2>/dev/null
                 reset_modem
                 return
             fi
@@ -72,19 +155,30 @@ reset_modem(){
 
 power_on_modem(){
     log "Ligando modem..."
-    echo 1 > $PWR_KEY
+    if [ ! -e "$PWR_KEY" ]; then
+        log "Power key device not found: $PWR_KEY"
+        return
+    fi
+    echo 1 > "$PWR_KEY"
     sleep 1
-    echo 0 > $PWR_KEY
+    echo 0 > "$PWR_KEY"
 }
 
 power_off_modem(){
     log "Desligando modem..."
-    echo 1 > $PWR_KEY
+    if [ ! -e "$PWR_KEY" ]; then
+        log "Power key device not found: $PWR_KEY"
+        return
+    fi
+    echo 1 > "$PWR_KEY"
     sleep 5
-    echo 0 > $PWR_KEY
+    echo 0 > "$PWR_KEY"
 }
+
+load_config
+validate_config
 
 while true; do
     watchdog
-    sleep 60
+    sleep "$CHECK_INTERVAL"
 done

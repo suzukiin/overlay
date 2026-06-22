@@ -3,11 +3,6 @@ ABORT BUSY ABORT 'NO CARRIER' ABORT VOICE ABORT 'NO DIALTONE' ABORT 'NO DIAL TON
 '' AT
 OK ATE1
 OK AT+CFUN=1
-OK AT+CNMP=38
-OK AT+CGDCONT=1,"IP","iot.datatem.com.br"
-
-# Se precisar testar autenticação via AT, descomente:
-#OK AT+CGAUTH=1,1,"datatem","datatem"
-
+OK AT+CGDCONT=1,"IP","<apn>"
 OK ATDT*99***1#
 CONNECT \d\c

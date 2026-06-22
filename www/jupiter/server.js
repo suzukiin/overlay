@@ -27,6 +27,7 @@ const paths = {
   adsCalibration: devicePath("/var/lib/jupiter/state/ads1015_calibration"),
   watchdogLog: devicePath("/var/log/watchdog.log"),
   systemLog: devicePath("/var/log/jupiter/system.log"),
+  network: devicePath("/etc/jupiter/network.json"),
   thermal: devicePath("/sys/class/thermal/thermal_zone0/temp"),
   netDev: devicePath("/proc/net/dev"),
   ttyUsb1: devicePath("/dev/ttyUSB1"),
@@ -223,10 +224,24 @@ function execProgram(file, args = [], options = {}) {
 }
 
 async function checkVpn() {
-  const iface = process.env.JUPITER_VPN_INTERFACE || "wg0";
+  const network = await readJson(paths.network, {});
+  const vpnConfig = network.vpn || {};
+  const enabled = process.env.JUPITER_VPN_ENABLED
+    ? process.env.JUPITER_VPN_ENABLED === "true"
+    : vpnConfig.enabled === true;
+  const iface = process.env.JUPITER_VPN_INTERFACE || vpnConfig.interface || "";
   const maxAge = Number(process.env.JUPITER_VPN_HANDSHAKE_MAX_AGE || 180);
-  const probeHost = process.env.JUPITER_VPN_PROBE_HOST || "10.100.1.1";
+  const probeHost = process.env.JUPITER_VPN_PROBE_HOST || vpnConfig.probe_host || "";
   const now = Math.floor(Date.now() / 1000);
+
+  if (!enabled) {
+    return { ok: false, disabled: true, method: "disabled" };
+  }
+
+  if (!iface) {
+    return { ok: false, method: "missing-interface" };
+  }
+
   const wg = await execProgram("wg", ["show", iface, "latest-handshakes"], { timeout: 1000 });
 
   if (!wg.err) {
@@ -241,9 +256,11 @@ async function checkVpn() {
     }
   }
 
-  const ping = await execProgram("ping", ["-I", iface, "-c", "1", "-W", "2", probeHost], { timeout: 3000 });
-  if (!ping.err) {
-    return { ok: true, method: "ping", probe: probeHost };
+  if (probeHost) {
+    const ping = await execProgram("ping", ["-I", iface, "-c", "1", "-W", "2", probeHost], { timeout: 3000 });
+    if (!ping.err) {
+      return { ok: true, method: "ping", probe: probeHost };
+    }
   }
 
   return { ok: false, method: "none", probe: probeHost };

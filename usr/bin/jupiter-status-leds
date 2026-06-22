@@ -8,15 +8,16 @@ fi
 . "$COMMON"
 
 CONFIG_FILE="${JUPITER_MQTT_CONFIG:-/home/proc/mqtt.json}"
+NETWORK_CONFIG="${JUPITER_NETWORK_CONFIG:-/etc/jupiter/network.json}"
 MONITOR_PID="${JUPITER_MONITOR_PID:-/var/run/jupiter/monitor.pid}"
 MONITOR_LOG="${JUPITER_MONITOR_LOG:-/var/log/jupiter/monitor.log}"
 CHECK_INTERVAL="${JUPITER_STATUS_LED_INTERVAL:-5}"
 RSSI_CGI="${JUPITER_RSSI_CGI:-/usr/libexec/jupiter/legacy-cgi/get-rssi}"
 VIN_STATUS_FILE="${JUPITER_VIN_STATUS_FILE:-/dev/vin_status}"
 VIN_PRESENT_VALUE="${JUPITER_VIN_PRESENT_VALUE:-0}"
-VPN_INTERFACE="${JUPITER_VPN_INTERFACE:-wg0}"
+VPN_INTERFACE="${JUPITER_VPN_INTERFACE:-}"
 VPN_HANDSHAKE_MAX_AGE="${JUPITER_VPN_HANDSHAKE_MAX_AGE:-180}"
-VPN_PROBE_HOST="${JUPITER_VPN_PROBE_HOST:-10.100.1.1}"
+VPN_PROBE_HOST="${JUPITER_VPN_PROBE_HOST:-}"
 
 json_get_string() {
     file="$1"
@@ -30,6 +31,26 @@ json_get_number() {
     key="$2"
     [ -f "$file" ] || return 0
     sed -n 's/.*"'"$key"'"[[:space:]]*:[[:space:]]*\([-0-9.][0-9.]*\).*/\1/p' "$file" | head -n 1
+}
+
+json_get_bool_in_object() {
+    file="$1"
+    object="$2"
+    key="$3"
+    [ -f "$file" ] || return 0
+    tr '\n' ' ' < "$file" \
+        | sed -n 's/.*"'"$object"'"[[:space:]]*:[[:space:]]*{[^}]*"'"$key"'"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' \
+        | head -n 1
+}
+
+json_get_string_in_object() {
+    file="$1"
+    object="$2"
+    key="$3"
+    [ -f "$file" ] || return 0
+    tr '\n' ' ' < "$file" \
+        | sed -n 's/.*"'"$object"'"[[:space:]]*:[[:space:]]*{[^}]*"'"$key"'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+        | head -n 1
 }
 
 host_reachable() {
@@ -97,11 +118,22 @@ mqtt_ok() {
 }
 
 vpn_ok() {
+    local enabled
+    local iface
+    local probe_host
     local latest
     local now
 
+    enabled="${JUPITER_VPN_ENABLED:-}"
+    [ -n "$enabled" ] || enabled="$(json_get_bool_in_object "$NETWORK_CONFIG" vpn enabled)"
+    [ "$enabled" = "true" ] || return 2
+
+    iface="$VPN_INTERFACE"
+    [ -n "$iface" ] || iface="$(json_get_string_in_object "$NETWORK_CONFIG" vpn interface)"
+    [ -n "$iface" ] || return 1
+
     if command -v wg >/dev/null 2>&1; then
-        latest="$(wg show "$VPN_INTERFACE" latest-handshakes 2>/dev/null | awk '{print $2}' | sort -nr | head -n 1)"
+        latest="$(wg show "$iface" latest-handshakes 2>/dev/null | awk '{print $2}' | sort -nr | head -n 1)"
         case "$latest" in
             ''|0) ;;
             *)
@@ -111,8 +143,11 @@ vpn_ok() {
         esac
     fi
 
-    if command -v ping >/dev/null 2>&1; then
-        ping -I "$VPN_INTERFACE" -c 1 -W 2 "$VPN_PROBE_HOST" >/dev/null 2>&1 && return 0
+    probe_host="$VPN_PROBE_HOST"
+    [ -n "$probe_host" ] || probe_host="$(json_get_string_in_object "$NETWORK_CONFIG" vpn probe_host)"
+
+    if [ -n "$probe_host" ] && command -v ping >/dev/null 2>&1; then
+        ping -I "$iface" -c 1 -W 2 "$probe_host" >/dev/null 2>&1 && return 0
     fi
 
     return 1
@@ -160,8 +195,12 @@ while true; do
     rssi2="$2"
     rssi3="$3"
 
-    vpn_color="red"
-    vpn_ok && vpn_color="green"
+    vpn_ok
+    case "$?" in
+        0) vpn_color="green" ;;
+        2) vpn_color="off" ;;
+        *) vpn_color="red" ;;
+    esac
 
     error_color="green"
     error_summary=""
