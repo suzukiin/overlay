@@ -248,6 +248,20 @@ Edite:
 - usuario/senha da operadora em `/etc/ppp/peers/jupiter-lte`, se necessario;
 - device do modem, normalmente `/dev/ttyUSB2`.
 
+O arquivo `network.json` nao reescreve o peer PPP. O peer tambem precisa
+apontar para o mesmo chat e para o mesmo device:
+
+```text
+connect "/usr/sbin/chat -v -f /etc/ppp/chat/jupiter-lte"
+
+/dev/ttyUSB2
+115200
+```
+
+Se o `network.json` declarar `chat_file` como `/etc/ppp/chat/DATATEM`, mas o
+peer ainda tiver `connect ... /etc/ppp/chat/jupiter-lte`, o `pppd` vai usar o
+caminho do peer. Nesse caso, o `jupiter-config-check lte-ready` deve falhar.
+
 Depois habilite o LTE:
 
 ```json

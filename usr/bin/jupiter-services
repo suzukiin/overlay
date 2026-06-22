@@ -7,6 +7,7 @@ WEB_PID="$JUPITER_RUN/web.pid"
 VIN_MONITOR_PID="$JUPITER_RUN/vin-monitor.pid"
 MONITOR_PID="$JUPITER_RUN/monitor.pid"
 STATUS_LEDS_PID="$JUPITER_RUN/status-leds.pid"
+LTE_WATCHDOG_PID="$JUPITER_RUN/lte-watchdog.pid"
 
 start_pid_service() {
     local name="$1"
@@ -77,9 +78,9 @@ start_status_leds() {
 
 start_watchdog() {
     if /usr/bin/jupiter-config-check lte-ready >/dev/null 2>&1; then
-        jupiter_start_once watchdog /usr/bin/jupiter-watchdog
+        start_pid_service lte-watchdog "$LTE_WATCHDOG_PID" /usr/bin/jupiter-watchdog
     else
-        pidof watchdog >/dev/null 2>&1 && jupiter_stop watchdog
+        stop_pid_service lte-watchdog "$LTE_WATCHDOG_PID"
         jupiter_log watchdog "not started; LTE is not provisioned"
     fi
 }
@@ -101,7 +102,7 @@ stop_status_leds() {
 }
 
 stop_watchdog() {
-    jupiter_stop watchdog
+    stop_pid_service lte-watchdog "$LTE_WATCHDOG_PID"
 }
 
 start_services() {

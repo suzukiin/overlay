@@ -65,6 +65,15 @@ require_file() {
     [ -f "$1" ] || err "arquivo ausente: $1"
 }
 
+peer_file_contains() {
+    file="$1"
+    value="$2"
+
+    [ -z "$value" ] && return 0
+    [ -f "$file" ] || return 1
+    grep -F -- "$value" "$file" >/dev/null 2>&1
+}
+
 require_file "$DEVICE_FILE"
 require_file "$MQTT_FILE"
 require_file "$TELEMETRY_FILE"
@@ -86,6 +95,7 @@ lte_enabled="$(json_get_bool_in_object "$NETWORK_FILE" lte enabled)"
 lte_peer="$(json_get_string_in_object "$NETWORK_FILE" lte peer)"
 lte_device="$(json_get_string_in_object "$NETWORK_FILE" lte device)"
 lte_chat_file="$(json_get_string_in_object "$NETWORK_FILE" lte chat_file)"
+lte_peer_file="/etc/ppp/peers/$lte_peer"
 
 monitor_ready() {
     [ -n "$device_id" ] || return 1
@@ -98,8 +108,10 @@ lte_ready() {
     [ "$lte_enabled" = "true" ] || return 1
     [ -n "$lte_peer" ] || return 1
     [ -n "$lte_device" ] || return 1
-    [ -f "/etc/ppp/peers/$lte_peer" ] || return 1
-    [ -z "$lte_chat_file" ] || [ -f "$lte_chat_file" ]
+    [ -f "$lte_peer_file" ] || return 1
+    [ -z "$lte_chat_file" ] || [ -f "$lte_chat_file" ] || return 1
+    peer_file_contains "$lte_peer_file" "$lte_device" || return 1
+    peer_file_contains "$lte_peer_file" "$lte_chat_file" || return 1
 }
 
 if [ "$mode" = "monitor-ready" ]; then
@@ -155,8 +167,10 @@ fi
 if [ "$lte_enabled" = "true" ]; then
     [ -n "$lte_peer" ] || warn "LTE habilitado sem peer em $NETWORK_FILE"
     [ -n "$lte_device" ] || warn "LTE habilitado sem device em $NETWORK_FILE"
-    [ -z "$lte_peer" ] || [ -f "/etc/ppp/peers/$lte_peer" ] || warn "peer LTE ausente: /etc/ppp/peers/$lte_peer"
+    [ -z "$lte_peer" ] || [ -f "$lte_peer_file" ] || warn "peer LTE ausente: $lte_peer_file"
     [ -z "$lte_chat_file" ] || [ -f "$lte_chat_file" ] || warn "chat LTE ausente: $lte_chat_file"
+    [ -z "$lte_peer" ] || [ ! -f "$lte_peer_file" ] || peer_file_contains "$lte_peer_file" "$lte_device" || warn "peer LTE nao referencia device do network.json: $lte_device"
+    [ -z "$lte_peer" ] || [ ! -f "$lte_peer_file" ] || peer_file_contains "$lte_peer_file" "$lte_chat_file" || warn "peer LTE nao referencia chat_file do network.json: $lte_chat_file"
 fi
 
 if [ -f "$INPUTS_FILE" ] && ! grep -q '"equipamentos"' "$INPUTS_FILE"; then

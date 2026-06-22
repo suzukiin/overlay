@@ -6,6 +6,7 @@ NETWORK_CONFIG="/etc/jupiter/network.json"
 WATCHDOG_LOG_FILE="/var/log/watchdog.log"
 PWR_KEY="/dev/pwr_key"
 PPP_IFACE="${PPP_IFACE:-ppp0}"
+DEVICE_WAIT_SECONDS="${JUPITER_LTE_DEVICE_WAIT_SECONDS:-60}"
 
 isUP=false
 
@@ -52,6 +53,49 @@ json_object_first_array_string() {
 log(){
     jupiter_log watchdog "$1"
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$WATCHDOG_LOG_FILE"
+}
+
+ppp_iface_up() {
+    ifconfig "$PPP_IFACE" > /dev/null 2>&1
+}
+
+ppp_health_ok() {
+    ppp_iface_up || return 1
+    ping "$HEALTH_TARGET" -c 1 -W 5 -I "$PPP_IFACE" > /dev/null 2>&1
+}
+
+stop_pppd() {
+    ifconfig "$PPP_IFACE" down 2>/dev/null
+
+    if pidof pppd >/dev/null 2>&1; then
+        log "Encerrando processo pppd anterior..."
+        killall pppd 2>/dev/null
+        sleep 2
+    fi
+}
+
+wait_for_modem_device() {
+    elapsed=0
+
+    while [ "$elapsed" -lt "$DEVICE_WAIT_SECONDS" ]; do
+        [ -e "$USB_PPP" ] && return 0
+        sleep 1
+        elapsed=$((elapsed + 1))
+    done
+
+    return 1
+}
+
+wait_for_ppp_iface() {
+    elapsed=0
+
+    while [ "$elapsed" -lt "$STARTUP_WAIT" ]; do
+        ppp_iface_up && return 0
+        sleep 1
+        elapsed=$((elapsed + 1))
+    done
+
+    return 1
 }
 
 load_config() {
@@ -102,47 +146,51 @@ validate_config() {
 watchdog(){
 
     if [ "$isUP" = "false" ]; then
-        pppd call "$PEERS" &
-        log "Iniciando conexao LTE..."
+        if ppp_health_ok; then
+            isUP=true
+            log "Conexao LTE ja esta ativa."
+            return
+        fi
 
-        sleep "$STARTUP_WAIT"
+        if ! wait_for_modem_device; then
+            log "Device LTE nao encontrado apos ${DEVICE_WAIT_SECONDS}s: $USB_PPP"
+            reset_modem
+            return
+        fi
 
-        if ifconfig "$PPP_IFACE" > /dev/null 2>&1; then
-            ping "$HEALTH_TARGET" -c 1 -I "$PPP_IFACE" > /dev/null 2>&1
-            if [ $? -ne 0 ]; then
-                isUP=false
-                log "Falha ao estabelecer conexao LTE, tentando novamente..."
-                ifconfig "$PPP_IFACE" down 2>/dev/null
-                reset_modem
-                return
-            fi
-            isUP=true   
+        stop_pppd
+        log "Iniciando conexao LTE peer=$PEERS device=$USB_PPP chat=$CHAT_FILE target=$HEALTH_TARGET"
+        pppd call "$PEERS" nodetach debug >> "$WATCHDOG_LOG_FILE" 2>&1 &
+
+        if ! wait_for_ppp_iface; then
+            isUP=false
+            log "Interface $PPP_IFACE nao subiu apos ${STARTUP_WAIT}s."
+            stop_pppd
+            reset_modem
+            return
+        fi
+
+        if ppp_health_ok; then
+            isUP=true
             log "Conexao LTE estabelecida com sucesso."
             return
-        else
-            isUP=false 
-            log "Falha ao estabelecer conexao LTE, tentando novamente..."
-            reset_modem
-            return
         fi
+
+        isUP=false
+        log "Interface $PPP_IFACE subiu, mas ping para $HEALTH_TARGET falhou."
+        stop_pppd
+        reset_modem
+        return
     else
-        if ifconfig "$PPP_IFACE" > /dev/null 2>&1; then
-            ping "$HEALTH_TARGET" -c 1 -I "$PPP_IFACE" > /dev/null 2>&1
-            if [ $? -eq 0 ]; then
-                return
-            else
-                isUP=false
-                log "Conexão perdida, reiniciando conexão LTE..."
-                ifconfig "$PPP_IFACE" down 2>/dev/null
-                reset_modem
-                return
-            fi
-        else
-            isUP=false
-            log "Conexão perdida, reiniciando conexão LTE..."
-            reset_modem
+        if ppp_health_ok; then
             return
         fi
+
+        isUP=false
+        log "Conexao LTE perdida ou sem resposta em $HEALTH_TARGET."
+        stop_pppd
+        reset_modem
+        return
     fi
 }
 
