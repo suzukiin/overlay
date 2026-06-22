@@ -3,9 +3,9 @@
 . /usr/bin/jupiter-common
 
 WATCHDOG_LOG_FILE="/var/log/watchdog.log"
-PEERS_DIR_FILE="/etc/ppp/peers/VIVO-PEERS"
-PEERS="VIVO-PEERS"
-PPPD_DIR_FILE="/etc/ppp/chat/VIVO"
+PEERS_DIR_FILE="/etc/ppp/peers/DATATEM-PEERS"
+PEERS="DATATEM-PEERS"
+PPPD_DIR_FILE="/etc/ppp/chat/DATATEM"
 USB_PPP="/dev/ttyUSB2"
 PWR_KEY="/dev/pwr_key"
 

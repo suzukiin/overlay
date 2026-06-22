@@ -7,47 +7,47 @@
       "ip": "26.1.3.1",
       "OIDS": [
         {
-          "oid": "1.3.6.1.4.1.2566.127.1.3.236.23.1.1.2.1.2",
+          "oid": "1.3.6.1.4.1.2566.127.1.3.236.23.1.1.2.1.2.0",
           "nome": "rsAvg050BtsSatCiCfgIoAsiOut1Enabled",
           "topico": "AVG050_ASI1"
         },
         {
-          "oid": "1.3.6.1.4.1.2566.127.1.3.236.23.1.1.2.2.2",
+          "oid": "1.3.6.1.4.1.2566.127.1.3.236.23.1.1.2.2.2.0",
           "nome": "rsAvg050BtsSatCiCfgIoAsiOut2Enabled",
           "topico": "AVG050_ASI2"
         },
         {
-          "oid": "1.3.6.1.4.1.2566.127.1.3.236.23.2.2.1.2.5",
+          "oid": "1.3.6.1.4.1.2566.127.1.3.236.23.2.2.1.2.5.0",
           "nome": "rsAvg050BtsSatCiMonSat1DemodLocked",
           "topico": "AVG050_SAT_STATUS"
         },
         {
-          "oid": "1.3.6.1.4.1.2566.127.1.3.236.23.2.2.1.2.8",
+          "oid": "1.3.6.1.4.1.2566.127.1.3.236.23.2.2.1.2.8.0",
           "nome": "rsAvg050BtsSatCiMonSat1DemodCnRatio",
           "topico": "AVG050_CN"
         },
         {
-          "oid": "1.3.6.1.4.1.2566.127.1.3.236.23.2.2.1.2.9",
+          "oid": "1.3.6.1.4.1.2566.127.1.3.236.23.2.2.1.2.9.0",
           "nome": "rsAvg050BtsSatCiMonSat1DemodRxPower",
           "topico": "AVG050_SAT_RX"
         },
         {
-          "oid": "1.3.6.1.4.1.2566.127.1.3.236.24.2.1.1",
+          "oid": "1.3.6.1.4.1.2566.127.1.3.236.24.2.1.1.0",
           "nome": "rsAvg050BtsIsdbtMonIsdbtRemuxStatus",
           "topico": "AVG050_REMUX_STATUS"
         },
         {
-          "oid": "1.3.6.1.4.1.2566.127.1.3.236.26.2.1.1",
+          "oid": "1.3.6.1.4.1.2566.127.1.3.236.26.2.1.1.0",
           "nome": "rsAvg050BtsDeviceInfoStateStatus",
           "topico": "AVG050_DEVICE_STATUS"
         },
         {
-          "oid": "1.3.6.1.4.1.2566.127.1.3.236.26.2.2.3.3",
+          "oid": "1.3.6.1.4.1.2566.127.1.3.236.26.2.2.3.3.0",
           "nome": "rsAvg050BtsDeviceInfoOverallStateEventId",
           "topico": "AVG050_STATE_EVENT"
         },
         {
-          "oid": "1.3.6.1.4.1.2566.127.1.3.236.26.2.4.3",
+          "oid": "1.3.6.1.4.1.2566.127.1.3.236.26.2.4.3.0",
           "nome": "rsAvg050BtsDeviceInfoFansTemperaturC",
           "topico": "AVG050_REMUX_TEMP"
         }

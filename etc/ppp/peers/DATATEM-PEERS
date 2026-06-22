@@ -1,0 +1,22 @@
+lock
+
+lcp-echo-failure 0
+lcp-echo-interval 0
+
+ipcp-accept-local
+ipcp-accept-remote
+noipdefault
+
+connect "/usr/sbin/chat -v -f /etc/ppp/chat/DATATEM"
+
+defaultroute
+replacedefaultroute
+usepeerdns
+
+/dev/ttyUSB2
+115200
+
+noauth
+
+user "datatem"
+password "datatem"

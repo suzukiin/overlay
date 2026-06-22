@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "device_id": "JUP104260001",
-  "serial_number": "JUP104260001",
+  "device_id": "",
+  "serial_number": "",
   "model": "jupiter-telemetry",
   "hardware_revision": "rev-a",
   "firmware_version": "0.0.1",

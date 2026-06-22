@@ -75,7 +75,7 @@ jupiter_mkdirs
 
 export_gpio 591 out /dev/relay1
 export_gpio 592 out /dev/relay2
-export_gpio 571 out /dev/pwr_key
+export_gpio 586 out /dev/pwr_key
 configure_vin_bias || export_gpio 575 in /dev/vin_status
 
 read_legacy_relay_state
