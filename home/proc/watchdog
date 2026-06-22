@@ -59,8 +59,18 @@ ppp_iface_up() {
     ifconfig "$PPP_IFACE" > /dev/null 2>&1
 }
 
+ppp_ipv4_address() {
+    ifconfig "$PPP_IFACE" 2>/dev/null \
+        | sed -n 's/.*inet addr:\([0-9.][0-9.]*\).*/\1/p; s/.*inet \([0-9.][0-9.]*\).*/\1/p' \
+        | head -n 1
+}
+
+ppp_has_ipv4() {
+    [ -n "$(ppp_ipv4_address)" ]
+}
+
 ppp_health_ok() {
-    ppp_iface_up || return 1
+    ppp_has_ipv4 || return 1
     ping "$HEALTH_TARGET" -c 1 -W 5 -I "$PPP_IFACE" > /dev/null 2>&1
 }
 
@@ -86,11 +96,11 @@ wait_for_modem_device() {
     return 1
 }
 
-wait_for_ppp_iface() {
+wait_for_ppp_health() {
     elapsed=0
 
     while [ "$elapsed" -lt "$STARTUP_WAIT" ]; do
-        ppp_iface_up && return 0
+        ppp_health_ok && return 0
         sleep 1
         elapsed=$((elapsed + 1))
     done
@@ -162,22 +172,20 @@ watchdog(){
         log "Iniciando conexao LTE peer=$PEERS device=$USB_PPP chat=$CHAT_FILE target=$HEALTH_TARGET"
         pppd call "$PEERS" nodetach debug >> "$WATCHDOG_LOG_FILE" 2>&1 &
 
-        if ! wait_for_ppp_iface; then
-            isUP=false
-            log "Interface $PPP_IFACE nao subiu apos ${STARTUP_WAIT}s."
-            stop_pppd
-            reset_modem
-            return
-        fi
-
-        if ppp_health_ok; then
+        if wait_for_ppp_health; then
             isUP=true
-            log "Conexao LTE estabelecida com sucesso."
+            log "Conexao LTE estabelecida com sucesso. ip=$(ppp_ipv4_address)"
             return
         fi
 
         isUP=false
-        log "Interface $PPP_IFACE subiu, mas ping para $HEALTH_TARGET falhou."
+        if ! ppp_iface_up; then
+            log "Interface $PPP_IFACE nao subiu apos ${STARTUP_WAIT}s."
+        elif ! ppp_has_ipv4; then
+            log "Interface $PPP_IFACE subiu, mas nao recebeu IPv4 apos ${STARTUP_WAIT}s."
+        else
+            log "Interface $PPP_IFACE recebeu IPv4 $(ppp_ipv4_address), mas ping para $HEALTH_TARGET falhou."
+        fi
         stop_pppd
         reset_modem
         return
