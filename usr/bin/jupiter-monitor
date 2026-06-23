@@ -9,6 +9,7 @@ fi
 
 MONITOR_BIN="${JUPITER_MONITOR_BIN:-/home/proc/monitor}"
 CONFIG_FILE="${1:-/home/proc/mqtt.json}"
+SECRETS_FILE="${JUPITER_SECRETS_FILE:-/home/proc/secrets.env}"
 NETWORK_WAIT="${JUPITER_MONITOR_NETWORK_WAIT:-120}"
 RESTART_DELAY="${JUPITER_MONITOR_RESTART_DELAY:-10}"
 MONITOR_LOG="${JUPITER_MONITOR_LOG:-$JUPITER_LOG_DIR/monitor.log}"
@@ -79,6 +80,13 @@ wait_for_broker() {
     return 0
 }
 
+load_secrets() {
+    if [ -f "$SECRETS_FILE" ]; then
+        . "$SECRETS_FILE"
+        export JUPITER_MQTT_PASSWORD
+    fi
+}
+
 trap stop_child INT TERM
 
 if [ ! -x "$MONITOR_BIN" ]; then
@@ -87,6 +95,7 @@ if [ ! -x "$MONITOR_BIN" ]; then
 fi
 
 jupiter_mkdirs
+load_secrets
 
 while true; do
     wait_for_broker
