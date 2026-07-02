@@ -36,8 +36,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
     async function fetchTraffic() {
 
-        const resopnse = await fetch("/cgi-bin/get-traffic");
-        const res = await resopnse.json();
+        const response = await fetch("/cgi-bin/get-traffic");
+        const res = await response.json();
 
         if (res.status == "Success") {
             document.getElementById("rx-traffic").textContent = res.data.rx_mb + " MB";
@@ -130,7 +130,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     async function fetchTelemetry() {
         try {
-            const response = await fetch("/api/telemetry-data?nocache=" + new Date().getTime());
+            const response = await fetch("/public/telemetry_data.json?nocache=" + new Date().getTime());
             if (!response.ok) throw new Error("Erro na requisição");
             
             const data = await response.json();

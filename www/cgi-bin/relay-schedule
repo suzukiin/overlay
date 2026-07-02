@@ -1,8 +1,13 @@
 #!/bin/sh
 
-. /usr/bin/jupiter-common
+COMMON="${JUPITER_COMMON:-/usr/bin/jupiter-common}"
+if [ ! -f "$COMMON" ]; then
+    COMMON="$(dirname "$0")/../../usr/bin/jupiter-common"
+fi
 
-SCHEDULE_CONFIG="/etc/jupiter/relay_schedule.json"
+. "$COMMON"
+
+SCHEDULE_CONFIG="${JUPITER_RELAY_SCHEDULE_CONFIG:-/etc/jupiter/relay_schedule.json}"
 TMP_CONFIG="/tmp/relay_schedule.$$"
 
 json_response() {

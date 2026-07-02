@@ -1,6 +1,3 @@
-www/jupiter/node_modules/
-www/jupiter/npm-debug.log*
-www/jupiter/.npm-cache/
 var/log/jupiter/*.log
 var/lib/jupiter/cache/
 var/lib/jupiter/run/

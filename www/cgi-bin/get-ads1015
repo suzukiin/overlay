@@ -1,8 +1,13 @@
 #!/bin/sh
 
-. /usr/bin/jupiter-common
+COMMON="${JUPITER_COMMON:-/usr/bin/jupiter-common}"
+if [ ! -f "$COMMON" ]; then
+    COMMON="$(dirname "$0")/../../usr/bin/jupiter-common"
+fi
 
-ADS_DIR="/var/lib/jupiter/iio/ads1015"
+. "$COMMON"
+
+ADS_DIR="${JUPITER_ADS_DIR:-/var/lib/jupiter/iio/ads1015}"
 CALIBRATION_STATE="$JUPITER_STATE/ads1015_calibration"
 DEFAULT_GAIN="3.060606"
 DEFAULT_OFFSET="0"

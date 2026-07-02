@@ -1,0 +1,41 @@
+#!/bin/sh
+
+VIN_STATUS_FILE="${JUPITER_VIN_STATUS_FILE:-/dev/vin_status}"
+GPIO_CHIP="${JUPITER_VIN_GPIOCHIP:-gpiochip0}"
+GPIO_LINE="${JUPITER_VIN_GPIO_LINE:-6}"
+PRESENT_VALUE="${JUPITER_VIN_PRESENT_VALUE:-0}"
+
+printf 'Content-Type: application/json\r\n\r\n'
+
+raw=""
+if command -v gpioget >/dev/null 2>&1; then
+    raw="$(gpioget -B disable "$GPIO_CHIP" "$GPIO_LINE" 2>/dev/null)"
+fi
+
+case "$raw" in
+    0|1) ;;
+    *)
+        if [ -r "$VIN_STATUS_FILE" ]; then
+            raw="$(cat "$VIN_STATUS_FILE" 2>/dev/null)"
+        fi
+        ;;
+esac
+
+case "$raw" in
+    0|1) ;;
+    *)
+        printf '{"status":"Error","msg":"VIN status not available"}\n'
+        exit 0
+        ;;
+esac
+
+if [ "$raw" = "$PRESENT_VALUE" ]; then
+    present=true
+    mode=normal
+else
+    present=false
+    mode=battery
+fi
+
+printf '{"status":"Success","data":{"raw":"%s","vin_status":%s,"vin_present":%s,"power_mode":"%s"}}\n' \
+    "$raw" "$raw" "$present" "$mode"

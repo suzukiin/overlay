@@ -1,0 +1,14 @@
+#!/bin/sh
+
+INFO_FILE="${JUPITER_INFO_FILE:-/home/proc/info.json}"
+
+printf 'Content-Type: application/json\r\n\r\n'
+
+if [ ! -r "$INFO_FILE" ]; then
+    printf '{"status":"Error","msg":"Nao foi possivel abrir o arquivo de configuracao"}\n'
+    exit 0
+fi
+
+printf '{"status":"Success","data":'
+cat "$INFO_FILE"
+printf '}\n'

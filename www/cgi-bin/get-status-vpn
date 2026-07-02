@@ -1,0 +1,61 @@
+#!/bin/sh
+
+NETWORK_CONFIG="${JUPITER_NETWORK_CONFIG:-/etc/jupiter/network.json}"
+MAX_AGE="${JUPITER_VPN_HANDSHAKE_MAX_AGE:-180}"
+
+json_get_bool_in_object() {
+    object="$1"
+    key="$2"
+    [ -f "$NETWORK_CONFIG" ] || return 0
+    tr '\n' ' ' < "$NETWORK_CONFIG" \
+        | sed -n 's/.*"'"$object"'"[[:space:]]*:[[:space:]]*{[^}]*"'"$key"'"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' \
+        | head -n 1
+}
+
+json_get_string_in_object() {
+    object="$1"
+    key="$2"
+    [ -f "$NETWORK_CONFIG" ] || return 0
+    tr '\n' ' ' < "$NETWORK_CONFIG" \
+        | sed -n 's/.*"'"$object"'"[[:space:]]*:[[:space:]]*{[^}]*"'"$key"'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+        | head -n 1
+}
+
+respond() {
+    printf 'Content-Type: application/json\r\n\r\n'
+    printf '%s\n' "$1"
+    exit 0
+}
+
+enabled="${JUPITER_VPN_ENABLED:-$(json_get_bool_in_object vpn enabled)}"
+iface="${JUPITER_VPN_INTERFACE:-$(json_get_string_in_object vpn interface)}"
+probe="${JUPITER_VPN_PROBE_HOST:-$(json_get_string_in_object vpn probe_host)}"
+
+if [ "$enabled" != "true" ]; then
+    respond '{"status":"Error","vpn":"offline","data":{"disabled":true,"method":"disabled"}}'
+fi
+
+if [ -z "$iface" ]; then
+    respond '{"status":"Error","vpn":"offline","data":{"method":"missing-interface"}}'
+fi
+
+if command -v wg >/dev/null 2>&1; then
+    latest="$(wg show "$iface" latest-handshakes 2>/dev/null | awk '{print $2}' | sort -nr | head -n 1)"
+    case "$latest" in
+        ''|0|*[!0-9]*) ;;
+        *)
+            now="$(date +%s)"
+            age=$((now - latest))
+            if [ "$age" -ge 0 ] && [ "$age" -le "$MAX_AGE" ]; then
+                respond "{\"status\":\"Success\",\"vpn\":\"online\",\"data\":{\"method\":\"handshake\",\"latest_handshake_age\":$age}}"
+            fi
+            ;;
+    esac
+fi
+
+if [ -n "$probe" ] && command -v ping >/dev/null 2>&1 \
+    && ping -I "$iface" -c 1 -W 2 "$probe" >/dev/null 2>&1; then
+    respond '{"status":"Success","vpn":"online","data":{"method":"ping"}}'
+fi
+
+respond '{"status":"Error","vpn":"offline","data":{"method":"none"}}'
