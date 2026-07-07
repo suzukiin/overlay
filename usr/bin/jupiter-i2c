@@ -6,6 +6,7 @@ I2C_BUS_DIR="/sys/bus/i2c/devices/i2c-1"
 ADS_DEVICE_DIR="/sys/bus/i2c/devices/1-0048"
 EEPROM_DEVICE_DIR="/sys/bus/i2c/devices/1-0050"
 EEPROM_PATH="$EEPROM_DEVICE_DIR/eeprom"
+ADS_DIVIDER_RATIO="3.060606061"
 
 log_i2c() {
     jupiter_log i2c "$*"
@@ -79,7 +80,8 @@ ads_read_channel() {
     local scale_file
     local raw
     local scale
-    local voltage
+    local adc_voltage
+    local input_voltage
 
     case "$channel" in
         0|1|2|3) ;;
@@ -101,9 +103,11 @@ ads_read_channel() {
         scale="1"
     fi
 
-    voltage="$(awk -v raw="$raw" -v scale="$scale" 'BEGIN { printf "%.6f", raw * scale }')"
-    printf '{"channel":%s,"raw":%s,"scale":%s,"voltage":%s,"iio_device":"%s"}\n' \
-        "$channel" "$raw" "$scale" "$voltage" "$iio_dir"
+    # O ABI IIO fornece milivolts após a aplicação de raw * scale.
+    adc_voltage="$(awk -v raw="$raw" -v scale="$scale" 'BEGIN { printf "%.6f", (raw * scale) / 1000 }')"
+    input_voltage="$(awk -v adc="$adc_voltage" -v ratio="$ADS_DIVIDER_RATIO" 'BEGIN { printf "%.6f", adc * ratio }')"
+    printf '{"channel":%s,"raw":%s,"scale":%s,"adc_voltage":%s,"divider_ratio":%s,"voltage":%s,"iio_device":"%s"}\n' \
+        "$channel" "$raw" "$scale" "$adc_voltage" "$ADS_DIVIDER_RATIO" "$input_voltage" "$iio_dir"
 }
 
 ads_read_all() {

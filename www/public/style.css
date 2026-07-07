@@ -274,28 +274,177 @@ h1.h2 {
     font-weight: 600;
 }
 
-.adc-scale-row,
-.adc-cal-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 34px;
-    gap: 8px;
+/* UPS battery gauge */
+.battery-card {
+    overflow: hidden;
+}
+
+.battery-summary {
+    display: flex;
     align-items: center;
+    gap: 18px;
 }
 
-.adc-scale-input {
-    min-width: 0;
-    height: 30px;
-    font-size: 0.75rem;
+.battery-shell {
+    position: relative;
+    width: 92px;
+    height: 42px;
+    padding: 4px;
+    border: 2px solid #8892b0;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.22);
 }
 
-.adc-scale-row .btn,
-.adc-cal-row .btn {
-    width: 34px;
-    height: 30px;
-    padding: 0;
+.battery-shell::after {
+    content: "";
+    position: absolute;
+    top: 11px;
+    right: -8px;
+    width: 6px;
+    height: 16px;
+    border-radius: 0 3px 3px 0;
+    background: #8892b0;
+}
+
+.battery-level {
+    width: 0;
+    height: 100%;
+    border-radius: 4px;
+    background: #6c757d;
+    box-shadow: 0 0 10px rgba(108, 117, 125, 0.35);
+    transition: width 0.6s ease, background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.battery-level.is-good {
+    background: #28a745;
+    box-shadow: 0 0 12px rgba(40, 167, 69, 0.45);
+}
+
+.battery-level.is-low {
+    background: #ffc107;
+    box-shadow: 0 0 12px rgba(255, 193, 7, 0.45);
+}
+
+.battery-level.is-critical {
+    background: #dc3545;
+    box-shadow: 0 0 12px rgba(220, 53, 69, 0.5);
+}
+
+.battery-scale {
+    display: flex;
+    justify-content: space-between;
+    color: #667085;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.66rem;
+}
+
+.battery-ups-control {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 111, 0, 0.16);
+}
+
+.battery-operation {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
+    gap: 8px;
+    min-height: 30px;
+    padding: 6px 10px;
+    border: 1px solid rgba(108, 117, 125, 0.35);
+    border-radius: 999px;
+    color: #8892b0;
+    background: rgba(108, 117, 125, 0.08);
+    font-size: 0.72rem;
+}
+
+.battery-operation-dot {
+    width: 8px;
+    height: 8px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: #6c757d;
+}
+
+.battery-operation.is-charging {
+    color: #28a745;
+    border-color: rgba(40, 167, 69, 0.38);
+    background: rgba(40, 167, 69, 0.08);
+}
+
+.battery-operation.is-charging .battery-operation-dot {
+    background: #28a745;
+    box-shadow: 0 0 0 rgba(40, 167, 69, 0.45);
+    animation: battery-charge-pulse 1.6s ease-out infinite;
+}
+
+.battery-card.is-charging {
+    animation: battery-card-charging 2.4s ease-in-out infinite;
+}
+
+.battery-card.is-charging .battery-level {
+    background-image: linear-gradient(90deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.35) 48%,
+        rgba(255, 255, 255, 0) 100%);
+    background-size: 45% 100%;
+    background-repeat: no-repeat;
+    animation: battery-charge-flow 1.8s linear infinite;
+}
+
+.battery-operation.is-using {
+    color: #ffc107;
+    border-color: rgba(255, 193, 7, 0.38);
+    background: rgba(255, 193, 7, 0.08);
+}
+
+.battery-operation.is-using .battery-operation-dot {
+    background: #ffc107;
+    box-shadow: 0 0 8px rgba(255, 193, 7, 0.55);
+}
+
+.battery-operation.is-disabled {
+    color: #8892b0;
+}
+
+@keyframes battery-charge-pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.5);
+    }
+    70% {
+        box-shadow: 0 0 0 7px rgba(40, 167, 69, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+    }
+}
+
+@keyframes battery-card-charging {
+    0%, 100% {
+        border-color: rgba(255, 255, 255, 0.08);
+    }
+    50% {
+        border-color: rgba(40, 167, 69, 0.42);
+        box-shadow: 0 0 20px rgba(40, 167, 69, 0.12);
+    }
+}
+
+@keyframes battery-charge-flow {
+    from {
+        background-position: -80% 0;
+    }
+    to {
+        background-position: 220% 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .battery-card.is-charging,
+    .battery-card.is-charging .battery-level,
+    .battery-operation.is-charging .battery-operation-dot {
+        animation: none;
+    }
 }
 
 /* Relay Scheduler */

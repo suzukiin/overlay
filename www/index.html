@@ -152,28 +152,67 @@
                     <div class="col-md-6 col-lg-3">
                         <div class="dash-card">
                             <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h6 class="text-muted text-uppercase small mb-0">Controle de Relés</h6>
+                                <h6 class="text-muted text-uppercase small mb-0">Relé Auxiliar</h6>
                                 <i class="bi bi-lightning-charge-fill text-jupiter"></i>
                             </div>
 
                             <div class="relay-controls">
-                                <div class="relay-item mb-2">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <small class="text-muted">Relé 1</small>
-                                        <div class="form-check form-switch m-0">
-                                            <input class="form-check-input relay-toggle" type="checkbox" id="relay1-toggle" data-relay="1">
-                                        </div>
-                                    </div>
-                                </div>
                                 <div class="relay-item">
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <small class="text-muted">Relé 2</small>
+                                        <div>
+                                            <small class="text-light d-block">Relé auxiliar</small>
+                                            <small class="text-muted font-mono" id="relay2-state">Relé 2 · --</small>
+                                        </div>
                                         <div class="form-check form-switch m-0">
                                             <input class="form-check-input relay-toggle" type="checkbox" id="relay2-toggle" data-relay="2">
                                         </div>
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 col-lg-3">
+                        <div class="dash-card battery-card">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="text-muted text-uppercase small mb-0">Bateria do UPS</h6>
+                                <i class="bi bi-battery-half text-jupiter" id="battery-icon"></i>
+                            </div>
+
+                            <div class="battery-summary">
+                                <div class="battery-shell" aria-label="Nível da bateria">
+                                    <div class="battery-level" id="battery-level"></div>
+                                </div>
+                                <div>
+                                    <h2 class="card-value mt-0 mb-0" id="battery-percent">--%</h2>
+                                    <small class="text-muted font-mono" id="battery-status">AGUARDANDO</small>
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center mt-3">
+                                <small class="text-light font-mono" id="battery-voltage">0.000 V</small>
+                                <small class="text-muted font-mono" id="battery-adc">AIN3 · --</small>
+                            </div>
+                            <div class="battery-scale mt-2">
+                                <span>3,50 V</span>
+                                <span>4,35 V</span>
+                            </div>
+
+                            <div class="battery-operation mt-3" id="battery-operation">
+                                <span class="battery-operation-dot"></span>
+                                <span class="font-mono" id="battery-operation-text">AGUARDANDO ENERGIA</span>
+                            </div>
+
+                            <div class="battery-ups-control mt-3">
+                                <div>
+                                    <small class="text-light d-block">Controle do UPS</small>
+                                    <small class="text-muted font-mono" id="ups-relay-state">Relé 1 · --</small>
+                                </div>
+                                <div class="form-check form-switch m-0">
+                                    <input class="form-check-input relay-toggle" type="checkbox" id="relay1-toggle" data-relay="1">
+                                </div>
+                            </div>
+                            <small class="text-muted font-mono d-block mt-2" id="ads-ch3-status">--</small>
                         </div>
                     </div>
 
@@ -206,87 +245,37 @@
                             <div class="ads1015-channels">
                                 <div class="ads-channel mb-3">
                                     <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <small class="text-muted">AIN0</small>
+                                        <small class="text-muted">Entrada 1 · 0–10 V</small>
                                         <small class="text-success font-mono" id="ads-ch0-status">--</small>
                                     </div>
                                     <div class="d-flex justify-content-between">
                                         <small class="text-light font-mono" id="ads-ch0-voltage">Entrada: 0.000 V</small>
                                         <small class="text-muted font-mono small" id="ads-ch0-raw">ADS: --</small>
                                     </div>
-                                    <div class="adc-cal-row mt-2">
-                                        <input class="form-control form-control-sm bg-dark border-secondary text-light font-mono adc-scale-input"
-                                            id="ads-ch0-gain" data-channel="0" inputmode="decimal" placeholder="ganho">
-                                        <input class="form-control form-control-sm bg-dark border-secondary text-light font-mono adc-scale-input"
-                                            id="ads-ch0-offset" data-channel="0" inputmode="decimal" placeholder="offset">
-                                        <button class="btn btn-sm btn-outline-secondary" type="button"
-                                            onclick="setAdsCalibration(0)" title="Aplicar calibração AIN0">
-                                            <i class="bi bi-check2"></i>
-                                        </button>
-                                    </div>
                                 </div>
 
                                 <div class="ads-channel mb-3">
                                     <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <small class="text-muted">AIN1</small>
+                                        <small class="text-muted">Entrada 2 · 0–10 V</small>
                                         <small class="text-success font-mono" id="ads-ch1-status">--</small>
                                     </div>
                                     <div class="d-flex justify-content-between">
                                         <small class="text-light font-mono" id="ads-ch1-voltage">Entrada: 0.000 V</small>
                                         <small class="text-muted font-mono small" id="ads-ch1-raw">ADS: --</small>
                                     </div>
-                                    <div class="adc-cal-row mt-2">
-                                        <input class="form-control form-control-sm bg-dark border-secondary text-light font-mono adc-scale-input"
-                                            id="ads-ch1-gain" data-channel="1" inputmode="decimal" placeholder="ganho">
-                                        <input class="form-control form-control-sm bg-dark border-secondary text-light font-mono adc-scale-input"
-                                            id="ads-ch1-offset" data-channel="1" inputmode="decimal" placeholder="offset">
-                                        <button class="btn btn-sm btn-outline-secondary" type="button"
-                                            onclick="setAdsCalibration(1)" title="Aplicar calibração AIN1">
-                                            <i class="bi bi-check2"></i>
-                                        </button>
-                                    </div>
                                 </div>
 
                                 <div class="ads-channel mb-3">
                                     <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <small class="text-muted">AIN2</small>
+                                        <small class="text-muted">Entrada 3 · 0–10 V</small>
                                         <small class="text-success font-mono" id="ads-ch2-status">--</small>
                                     </div>
                                     <div class="d-flex justify-content-between">
                                         <small class="text-light font-mono" id="ads-ch2-voltage">Entrada: 0.000 V</small>
                                         <small class="text-muted font-mono small" id="ads-ch2-raw">ADS: --</small>
                                     </div>
-                                    <div class="adc-cal-row mt-2">
-                                        <input class="form-control form-control-sm bg-dark border-secondary text-light font-mono adc-scale-input"
-                                            id="ads-ch2-gain" data-channel="2" inputmode="decimal" placeholder="ganho">
-                                        <input class="form-control form-control-sm bg-dark border-secondary text-light font-mono adc-scale-input"
-                                            id="ads-ch2-offset" data-channel="2" inputmode="decimal" placeholder="offset">
-                                        <button class="btn btn-sm btn-outline-secondary" type="button"
-                                            onclick="setAdsCalibration(2)" title="Aplicar calibração AIN2">
-                                            <i class="bi bi-check2"></i>
-                                        </button>
-                                    </div>
                                 </div>
 
-                                <div class="ads-channel">
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <small class="text-muted">AIN3</small>
-                                        <small class="text-success font-mono" id="ads-ch3-status">--</small>
-                                    </div>
-                                    <div class="d-flex justify-content-between">
-                                        <small class="text-light font-mono" id="ads-ch3-voltage">Entrada: 0.000 V</small>
-                                        <small class="text-muted font-mono small" id="ads-ch3-raw">ADS: --</small>
-                                    </div>
-                                    <div class="adc-cal-row mt-2">
-                                        <input class="form-control form-control-sm bg-dark border-secondary text-light font-mono adc-scale-input"
-                                            id="ads-ch3-gain" data-channel="3" inputmode="decimal" placeholder="ganho">
-                                        <input class="form-control form-control-sm bg-dark border-secondary text-light font-mono adc-scale-input"
-                                            id="ads-ch3-offset" data-channel="3" inputmode="decimal" placeholder="offset">
-                                        <button class="btn btn-sm btn-outline-secondary" type="button"
-                                            onclick="setAdsCalibration(3)" title="Aplicar calibração AIN3">
-                                            <i class="bi bi-check2"></i>
-                                        </button>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     </div>

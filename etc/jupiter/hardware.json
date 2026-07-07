@@ -5,6 +5,8 @@
       "number": 591,
       "direction": "out",
       "path": "/dev/relay1",
+      "role": "ups_enable",
+      "display_name": "Sistema UPS",
       "active_high": true,
       "safe_state": 0
     },
@@ -12,6 +14,8 @@
       "number": 592,
       "direction": "out",
       "path": "/dev/relay2",
+      "role": "auxiliary",
+      "display_name": "Relé auxiliar",
       "active_high": true,
       "safe_state": 0
     },
@@ -50,11 +54,14 @@
       "unit": "raw"
     },
     {
-      "name": "analog_4",
+      "name": "battery",
       "path": "/var/lib/jupiter/iio/ads1015/in_voltage3_raw",
       "scale": 1.0,
       "offset": 0.0,
-      "unit": "raw"
+      "unit": "raw",
+      "role": "battery_voltage",
+      "minimum_voltage": 3.5,
+      "maximum_voltage": 4.35
     }
   ]
 }

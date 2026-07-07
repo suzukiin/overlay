@@ -223,6 +223,121 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
+    const batteryPowerState = {
+        vinPresent: null,
+        upsEnabled: null
+    };
+
+    function updateBatteryOperation() {
+        const cardElement = document.querySelector(".battery-card");
+        const operationElement = document.getElementById("battery-operation");
+        const textElement = document.getElementById("battery-operation-text");
+
+        if (!cardElement || !operationElement || !textElement) return;
+
+        cardElement.classList.remove("is-charging", "is-using", "is-disabled");
+        operationElement.classList.remove("is-charging", "is-using", "is-disabled");
+
+        if (batteryPowerState.upsEnabled === null || batteryPowerState.vinPresent === null) {
+            textElement.textContent = "AGUARDANDO ENERGIA";
+            return;
+        }
+
+        if (!batteryPowerState.upsEnabled) {
+            cardElement.classList.add("is-disabled");
+            operationElement.classList.add("is-disabled");
+            textElement.textContent = "UPS DESATIVADO";
+            return;
+        }
+
+        if (batteryPowerState.vinPresent) {
+            cardElement.classList.add("is-charging");
+            operationElement.classList.add("is-charging");
+            textElement.textContent = "BATERIA CARREGANDO";
+            return;
+        }
+
+        cardElement.classList.add("is-using");
+        operationElement.classList.add("is-using");
+        textElement.textContent = "BATERIA EM USO";
+    }
+
+    function setBatteryUnavailable() {
+        const percentElement = document.getElementById("battery-percent");
+        const voltageElement = document.getElementById("battery-voltage");
+        const statusElement = document.getElementById("battery-status");
+        const levelElement = document.getElementById("battery-level");
+        const adcElement = document.getElementById("battery-adc");
+
+        if (percentElement) percentElement.textContent = "--%";
+        if (voltageElement) voltageElement.textContent = "-- V";
+        if (statusElement) {
+            statusElement.textContent = "INDISPONÍVEL";
+            statusElement.className = "text-danger font-mono";
+        }
+        if (adcElement) adcElement.textContent = "AIN3 · erro";
+        if (levelElement) {
+            levelElement.style.width = "0%";
+            levelElement.className = "battery-level";
+        }
+    }
+
+    function updateBatteryGauge(channel) {
+        const voltage = Number(channel.voltage);
+        const minVoltage = Number(channel.battery_min_voltage ?? 3.5);
+        const maxVoltage = Number(channel.battery_max_voltage ?? 4.35);
+        const reportedPercent = Number(channel.battery_percent);
+        const calculatedPercent = ((voltage - minVoltage) / (maxVoltage - minVoltage)) * 100;
+        const percent = Math.round(Math.max(0, Math.min(100,
+            Number.isFinite(reportedPercent) ? reportedPercent : calculatedPercent)));
+        const percentElement = document.getElementById("battery-percent");
+        const voltageElement = document.getElementById("battery-voltage");
+        const statusElement = document.getElementById("battery-status");
+        const levelElement = document.getElementById("battery-level");
+        const adcElement = document.getElementById("battery-adc");
+        const iconElement = document.getElementById("battery-icon");
+
+        if (!Number.isFinite(voltage)) {
+            setBatteryUnavailable();
+            return;
+        }
+
+        let label = "NORMAL";
+        let tone = "success";
+        let levelClass = "is-good";
+        let iconClass = "bi-battery-half";
+
+        if (percent <= 15) {
+            label = "CRÍTICA";
+            tone = "danger";
+            levelClass = "is-critical";
+            iconClass = "bi-battery";
+        } else if (percent <= 35) {
+            label = "BAIXA";
+            tone = "warning";
+            levelClass = "is-low";
+            iconClass = "bi-battery-half";
+        } else if (percent >= 95) {
+            label = "CARREGADA";
+            iconClass = "bi-battery-full";
+        }
+
+        if (percentElement) percentElement.textContent = `${percent}%`;
+        if (voltageElement) voltageElement.textContent = `${voltage.toFixed(3)} V`;
+        if (statusElement) {
+            statusElement.textContent = label;
+            statusElement.className = `text-${tone} font-mono`;
+        }
+        if (adcElement) adcElement.textContent = `AIN3 · raw ${channel.raw}`;
+        if (levelElement) {
+            levelElement.style.width = `${percent}%`;
+            levelElement.className = `battery-level ${levelClass}`;
+        }
+        if (iconElement) {
+            iconElement.className = `bi ${iconClass} text-${tone}`;
+        }
+    }
+
     async function fetchAds1015() {
         try {
             const response = await fetch("/cgi-bin/get-ads1015");
@@ -235,27 +350,24 @@ document.addEventListener("DOMContentLoaded", function () {
                     const adsVoltage = parseFloat(channel.ads_voltage);
                     const raw = channel.raw;
                     const kernelScale = channel.kernel_scale;
-                    const gain = channel.gain;
-                    const offset = channel.offset;
-
                     const voltageElement = document.getElementById(`ads-ch${ch}-voltage`);
                     const rawElement = document.getElementById(`ads-ch${ch}-raw`);
                     const statusElement = document.getElementById(`ads-ch${ch}-status`);
-                    const gainElement = document.getElementById(`ads-ch${ch}-gain`);
-                    const offsetElement = document.getElementById(`ads-ch${ch}-offset`);
 
-                    if (voltageElement && rawElement && statusElement && gainElement && offsetElement) {
+                    if (ch === 3 || channel.role === "battery") {
+                        updateBatteryGauge(channel);
+                        if (statusElement) {
+                            statusElement.textContent = `ADC OK · ${adsVoltage.toFixed(3)} V`;
+                            statusElement.className = "text-success font-mono d-block mt-2";
+                        }
+                        return;
+                    }
+
+                    if (voltageElement && rawElement && statusElement) {
                         voltageElement.textContent = `Entrada: ${voltage.toFixed(3)} V`;
                         rawElement.textContent = `ADS: ${adsVoltage.toFixed(3)} V | raw: ${raw} | k: ${kernelScale}`;
                         statusElement.textContent = "OK";
                         statusElement.className = "text-success font-mono";
-
-                        if (document.activeElement !== gainElement) {
-                            gainElement.value = gain;
-                        }
-                        if (document.activeElement !== offsetElement) {
-                            offsetElement.value = offset;
-                        }
                     }
                 });
             } else {
@@ -267,6 +379,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         statusElement.className = "text-danger font-mono";
                     }
                 }
+                setBatteryUnavailable();
             }
         } catch (error) {
             console.error("Erro ao buscar ADS1015:", error);
@@ -277,47 +390,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     statusElement.className = "text-danger font-mono";
                 }
             }
-        }
-    }
-
-    async function setAdsCalibration(channel) {
-        const gainElement = document.getElementById(`ads-ch${channel}-gain`);
-        const offsetElement = document.getElementById(`ads-ch${channel}-offset`);
-        const statusElement = document.getElementById(`ads-ch${channel}-status`);
-        const gain = gainElement ? gainElement.value.trim() : "";
-        const offset = offsetElement ? offsetElement.value.trim() : "0";
-
-        if (!/^[0-9]+(\.[0-9]+)?$/.test(gain)) {
-            window.alert("Ganho inválido. Para o divisor 68k/33k use inicialmente 3.060606.");
-            return;
-        }
-
-        if (!/^-?[0-9]+(\.[0-9]+)?$/.test(offset)) {
-            window.alert("Offset inválido. Use número em volts, exemplo: 0 ou -0.015");
-            return;
-        }
-
-        try {
-            if (statusElement) {
-                statusElement.textContent = "SALVANDO";
-                statusElement.className = "text-warning font-mono";
-            }
-
-            const response = await fetch(`/cgi-bin/get-ads1015?channel=${channel}&gain=${encodeURIComponent(gain)}&offset=${encodeURIComponent(offset)}`, {
-                method: "POST"
-            });
-            const res = await response.json();
-
-            if (res.status === "Success") {
-                fetchAds1015();
-            } else {
-                window.alert("Erro ao salvar scale: " + (res.msg || "--"));
-                fetchAds1015();
-            }
-        } catch (error) {
-            console.error("Erro ao salvar calibração do ADS1015:", error);
-            window.alert("Erro ao salvar calibração");
-            fetchAds1015();
+            setBatteryUnavailable();
         }
     }
 
@@ -332,18 +405,24 @@ document.addEventListener("DOMContentLoaded", function () {
 
             if (res.status === "Success") {
                 const present = Boolean(res.data.vin_present);
+                batteryPowerState.vinPresent = present;
+                updateBatteryOperation();
                 statusElement.textContent = present ? "NORMAL" : "BATERIA";
                 statusElement.className = present
                     ? "card-value mt-1 mb-0 text-success"
                     : "card-value mt-1 mb-0 text-danger";
                 rawElement.textContent = String(res.data.raw ?? "--");
             } else {
+                batteryPowerState.vinPresent = null;
+                updateBatteryOperation();
                 statusElement.textContent = "ERRO";
                 statusElement.className = "card-value mt-1 mb-0 text-warning";
                 rawElement.textContent = "--";
             }
         } catch (error) {
             console.error("Erro ao buscar VIN:", error);
+            batteryPowerState.vinPresent = null;
+            updateBatteryOperation();
         }
     }
 
@@ -437,20 +516,38 @@ document.addEventListener("DOMContentLoaded", function () {
     fetchAds1015();
     fetchVinStatus();
     window.fetchLogs = fetchLogs;
-    window.setAdsCalibration = setAdsCalibration;
 
     // Relay Control Functions
+    function updateRelayControls(data) {
+        const relay1Toggle = document.getElementById("relay1-toggle");
+        const relay2Toggle = document.getElementById("relay2-toggle");
+        const upsState = document.getElementById("ups-relay-state");
+        const relay2State = document.getElementById("relay2-state");
+        const upsEnabled = Boolean(data.ups_enabled ?? data.relay1);
+        const relay2Enabled = Boolean(data.relay2);
+
+        if (relay1Toggle) relay1Toggle.checked = upsEnabled;
+        if (relay2Toggle) relay2Toggle.checked = relay2Enabled;
+        if (upsState) {
+            upsState.textContent = `Relé 1 · ${upsEnabled ? "ATIVO" : "DESATIVADO"}`;
+            upsState.className = `${upsEnabled ? "text-success" : "text-muted"} font-mono`;
+        }
+        if (relay2State) {
+            relay2State.textContent = `Relé 2 · ${relay2Enabled ? "ATIVO" : "DESATIVADO"}`;
+            relay2State.className = `${relay2Enabled ? "text-success" : "text-muted"} font-mono`;
+        }
+
+        batteryPowerState.upsEnabled = upsEnabled;
+        updateBatteryOperation();
+    }
+
     async function fetchRelays() {
         try {
             const response = await fetch("/cgi-bin/relay-control");
             const res = await response.json();
 
             if (res.status == "Success") {
-                const relay1Toggle = document.getElementById("relay1-toggle");
-                const relay2Toggle = document.getElementById("relay2-toggle");
-                
-                relay1Toggle.checked = res.data.relay1;
-                relay2Toggle.checked = res.data.relay2;
+                updateRelayControls(res.data);
             } else {
                 console.error("Erro ao buscar estado dos relés:", res.msg);
             }
@@ -460,6 +557,11 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     async function setRelay(relay, state) {
+        const toggle = document.getElementById(`relay${relay}-toggle`);
+        const stateElement = document.getElementById(relay == 1 ? "ups-relay-state" : "relay2-state");
+
+        if (toggle) toggle.disabled = true;
+
         try {
             const response = await fetch(`/cgi-bin/relay-control?relay=${relay}&state=${state ? 1 : 0}`, {
                 method: "POST"
@@ -467,20 +569,20 @@ document.addEventListener("DOMContentLoaded", function () {
             const res = await response.json();
 
             if (res.status == "Success") {
-                const relay1Toggle = document.getElementById("relay1-toggle");
-                const relay2Toggle = document.getElementById("relay2-toggle");
-                
-                relay1Toggle.checked = res.data.relay1;
-                relay2Toggle.checked = res.data.relay2;
+                updateRelayControls(res.data);
             } else {
-                console.error("Erro ao alterar relé:", res.msg);
-                // Restaurar estado visual anterior
-                fetchRelays();
+                throw new Error(res.msg || "Falha ao aplicar estado");
             }
         } catch (error) {
             console.error("Erro na requisição de alteração de relé:", error);
-            // Restaurar estado visual anterior
-            fetchRelays();
+            if (stateElement) {
+                stateElement.textContent = "ERRO AO ACIONAR";
+                stateElement.className = "text-danger font-mono";
+            }
+            if (toggle) toggle.checked = !state;
+            window.setTimeout(fetchRelays, 1500);
+        } finally {
+            if (toggle) toggle.disabled = false;
         }
     }
 
@@ -567,6 +669,10 @@ document.addEventListener("DOMContentLoaded", function () {
         return days.map(day => dayLabels[day] || day).join(", ");
     }
 
+    function relayLabel(relay) {
+        return Number(relay) === 1 ? "UPS (Relé 1)" : "Auxiliar (Relé 2)";
+    }
+
     async function fetchScheduleConfig() {
         try {
             setScheduleSaveStatus("carregando", "secondary");
@@ -632,7 +738,7 @@ document.addEventListener("DOMContentLoaded", function () {
                             <td>
                                 <div class="font-mono text-light scheduler-rule-id">${rule.id || "--"}</div>
                             </td>
-                            <td><span class="badge bg-dark border border-secondary text-secondary font-mono">Relé ${rule.relay}</span></td>
+                            <td><span class="badge bg-dark border border-secondary text-secondary font-mono">${relayLabel(rule.relay)}</span></td>
                             <td><span class="badge bg-${stateClass} bg-opacity-10 text-${stateClass} border border-${stateClass} border-opacity-25">${stateLabel}</span></td>
                             <td class="font-mono text-light">${rule.time || "--"}</td>
                             <td class="text-muted">${daysStr}</td>
@@ -714,7 +820,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const newRule = {
             id: "rule_" + Date.now(),
             enabled: true,
-            relay: 1,
+            relay: 2,
             state: 1,
             time: "08:00",
             days: ["mon", "tue", "wed", "thu", "fri"]
@@ -759,8 +865,8 @@ document.addEventListener("DOMContentLoaded", function () {
                             <div class="mb-3">
                                 <label for="ruleRelay" class="form-label text-light small text-uppercase">Relé</label>
                                 <select class="form-select bg-dark border-secondary text-light" id="ruleRelay">
-                                    <option value="1" ${rule.relay == 1 ? 'selected' : ''}>Relé 1</option>
-                                    <option value="2" ${rule.relay == 2 ? 'selected' : ''}>Relé 2</option>
+                                    <option value="1" ${rule.relay == 1 ? 'selected' : ''}>UPS (Relé 1)</option>
+                                    <option value="2" ${rule.relay == 2 ? 'selected' : ''}>Auxiliar (Relé 2)</option>
                                 </select>
                             </div>
 
