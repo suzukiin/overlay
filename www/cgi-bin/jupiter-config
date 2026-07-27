@@ -239,7 +239,11 @@ EOF
         chmod 600 "$SECRETS_FILE"
     fi
 
-    ok "Configuração salva. Reinicie os serviços para aplicar o MQTT."
+    if [ -x /usr/bin/jupiter-services ]; then
+        /usr/bin/jupiter-services restart-monitor
+    fi
+
+    ok "Configuração salva. Monitor MQTT reiniciado."
 }
 
 case "$REQUEST_METHOD" in

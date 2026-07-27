@@ -118,7 +118,7 @@ load_config() {
     STARTUP_WAIT="$(json_object_number "$NETWORK_CONFIG" lte startup_wait_seconds)"
 
     case "$CHECK_INTERVAL" in
-        ""|*[!0-9]*) CHECK_INTERVAL=60 ;;
+        ""|*[!0-9]*) CHECK_INTERVAL=300 ;;
     esac
 
     case "$STARTUP_WAIT" in

@@ -105,6 +105,11 @@ stop_watchdog() {
     stop_pid_service lte-watchdog "$LTE_WATCHDOG_PID"
 }
 
+restart_monitor() {
+    stop_pid_service monitor "$MONITOR_PID"
+    start_monitor
+}
+
 start_services() {
     jupiter_mkdirs
 
@@ -143,8 +148,11 @@ case "$1" in
         stop_services
         start_services
         ;;
+    restart-monitor)
+        restart_monitor
+        ;;
     *)
-        echo "Usage: $0 {start|stop|restart}"
+        echo "Usage: $0 {start|stop|restart|restart-monitor}"
         exit 1
         ;;
 esac

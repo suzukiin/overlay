@@ -10,3 +10,10 @@ partir de `/www`.
 O `/usr/bin/jupiter-web` inicia o `httpd` em primeiro plano para que o
 `jupiter-services` possa supervisioná-lo. A configuração de execução continua
 em `/etc/jupiter` e `/home/proc`; ela não é duplicada na raiz web.
+
+## Modo econômico de dados
+
+A interface é servida sem CDNs, fontes externas ou Bootstrap remoto para evitar
+downloads pela conexão celular. As atualizações automáticas usam intervalos de
+60 segundos para leituras locais e 5 minutos para telemetria/tráfego; logs e
+agendamento são carregados apenas sob demanda.

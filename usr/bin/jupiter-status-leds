@@ -11,7 +11,8 @@ CONFIG_FILE="${JUPITER_MQTT_CONFIG:-/home/proc/mqtt.json}"
 NETWORK_CONFIG="${JUPITER_NETWORK_CONFIG:-/etc/jupiter/network.json}"
 MONITOR_PID="${JUPITER_MONITOR_PID:-/var/run/jupiter/monitor.pid}"
 MONITOR_LOG="${JUPITER_MONITOR_LOG:-/var/log/jupiter/monitor.log}"
-CHECK_INTERVAL="${JUPITER_STATUS_LED_INTERVAL:-5}"
+CHECK_INTERVAL="${JUPITER_STATUS_LED_INTERVAL:-60}"
+INTERNET_CHECK_ENABLED="${JUPITER_STATUS_LED_INTERNET_CHECK:-false}"
 RSSI_CGI="${JUPITER_RSSI_CGI:-/www/cgi-bin/get-rssi}"
 VIN_STATUS_FILE="${JUPITER_VIN_STATUS_FILE:-/dev/vin_status}"
 VIN_PRESENT_VALUE="${JUPITER_VIN_PRESENT_VALUE:-0}"
@@ -185,7 +186,7 @@ rssi_colors() {
 }
 
 jupiter_mkdirs
-jupiter_log status-leds "started interval=${CHECK_INTERVAL}s"
+jupiter_log status-leds "started interval=${CHECK_INTERVAL}s internet_check=${INTERNET_CHECK_ENABLED}"
 LAST_ERROR_SUMMARY=""
 
 while true; do
@@ -204,7 +205,9 @@ while true; do
 
     error_color="green"
     error_summary=""
-    internet_ok || error_summary="${error_summary} internet"
+    if [ "$INTERNET_CHECK_ENABLED" = "true" ]; then
+        internet_ok || error_summary="${error_summary} internet"
+    fi
     mqtt_ok || error_summary="${error_summary} mqtt"
     vin_ok || error_summary="${error_summary} vin"
     if [ -n "$error_summary" ]; then

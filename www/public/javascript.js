@@ -1,4 +1,36 @@
 document.addEventListener("DOMContentLoaded", function () {
+    const POLL_INTERVALS = {
+        quick: 60000,
+        slow: 300000
+    };
+
+    const pollers = [];
+
+    function shouldPoll() {
+        return !document.hidden;
+    }
+
+    function startPoller(task, intervalMs) {
+        let inFlight = false;
+
+        async function run(force = false) {
+            if (!force && !shouldPoll()) return;
+            if (inFlight) return;
+
+            inFlight = true;
+            try {
+                await task();
+            } catch (error) {
+                console.error("Falha na atualização periódica:", error);
+            } finally {
+                inFlight = false;
+            }
+        }
+
+        run(true);
+        pollers.push(run);
+        return window.setInterval(run, intervalMs);
+    }
 
     async function fetchNavbarInfo() {
 
@@ -81,7 +113,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     async function fetchLogs() {
-        const response = await fetch("/cgi-bin/get-log-watchdog?limit=60");
+        const response = await fetch("/cgi-bin/get-log-watchdog?limit=30");
         const res = await response.json();
 
         if (res.status == "Success") {
@@ -108,7 +140,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 logsSummary.textContent = `${res.shown || 0}/${res.total || 0} linhas`;
             }
 
-            groupedLogs.slice(-30).forEach(log => {
+            if (groupedLogs.length === 0) {
+                logsBody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Nenhum log disponível.</td></tr>`;
+                return;
+            }
+
+            groupedLogs.slice(-20).forEach(log => {
                 const countBadge = log.count > 1
                     ? `<span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 ms-2">x${log.count}</span>`
                     : "";
@@ -130,7 +167,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     async function fetchTelemetry() {
         try {
-            const response = await fetch("/public/telemetry_data.json?nocache=" + new Date().getTime());
+            const response = await fetch("/public/telemetry_data.json", { cache: "no-cache" });
             if (!response.ok) throw new Error("Erro na requisição");
             
             const data = await response.json();
@@ -427,10 +464,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     async function fetchStatusVpn() {
-
-        const response = await fetch("/cgi-bin/get-status-vpn");
-        const res = await response.json();
-
         var connectionBagdeElement = document.getElementById("connection-badge");
         var connectionDotElement = document.getElementById("connection-dot");
         var connectionTextElement = document.getElementById("connection-text");
@@ -438,6 +471,9 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!connectionBagdeElement || !connectionDotElement || !connectionTextElement) {
             return;
         }
+
+        const response = await fetch("/cgi-bin/get-status-vpn");
+        const res = await response.json();
 
         if (res.status == "Success") {
 
@@ -505,16 +541,6 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    fetchStatusVpn();
-    fetchLogs();
-    fetchNavbarInfo();
-    fetchUptime();
-    fetchTraffic();
-    fetchCpuTemperature();
-    fetchTelemetry();
-    fetchRssi();
-    fetchAds1015();
-    fetchVinStatus();
     window.fetchLogs = fetchLogs;
 
     // Relay Control Functions
@@ -595,12 +621,6 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 
-    // Load initial relay state and update periodically
-    fetchRelays();
-    setInterval(fetchRelays, 5000);
-    setInterval(fetchAds1015, 5000);
-    setInterval(fetchVinStatus, 5000);
-
     // ============ RELAY SCHEDULER FUNCTIONS ============
     
     let scheduleData = {
@@ -609,6 +629,7 @@ document.addEventListener("DOMContentLoaded", function () {
         timezone: "local",
         rules: []
     };
+    let scheduleLoaded = false;
 
     const dayLabels = {
         mon: "Seg",
@@ -647,6 +668,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         if (enabledToggle) {
             enabledToggle.checked = enabled;
+            enabledToggle.disabled = !scheduleLoaded;
         }
 
         if (badge) {
@@ -681,15 +703,18 @@ document.addEventListener("DOMContentLoaded", function () {
 
             if (res.status == "Success" && res.data) {
                 scheduleData = normalizeScheduleData(res.data);
+                scheduleLoaded = true;
                 renderScheduleRules();
                 setScheduleSaveStatus("sincronizado", "success");
             } else {
                 console.error("Error fetching schedule:", res.msg);
-                renderScheduleRules(); // Show empty
+                scheduleLoaded = false;
+                renderScheduleRules();
                 setScheduleSaveStatus("erro", "danger");
             }
         } catch (error) {
             console.error("Error fetching schedule config:", error);
+            scheduleLoaded = false;
             renderScheduleRules();
             setScheduleSaveStatus("erro", "danger");
         }
@@ -698,6 +723,16 @@ document.addEventListener("DOMContentLoaded", function () {
     function renderScheduleRules() {
         const container = document.getElementById("schedule-rules-container");
         updateSchedulerHeader();
+
+        if (!scheduleLoaded) {
+            container.innerHTML = `
+                <div class="scheduler-empty">
+                    <i class="bi bi-calendar2-x text-secondary fs-4"></i>
+                    <span>Agenda não carregada</span>
+                </div>
+            `;
+            return;
+        }
 
         if (!scheduleData.rules || scheduleData.rules.length === 0) {
             container.innerHTML = `
@@ -848,12 +883,12 @@ document.addEventListener("DOMContentLoaded", function () {
             }).join("");
 
         const modal = `
-            <div class="modal fade" id="ruleModal" tabindex="-1">
+            <div class="modal is-open" id="ruleModal" role="dialog" aria-modal="true" aria-labelledby="ruleModalTitle">
                 <div class="modal-dialog">
                     <div class="modal-content bg-dark border border-secondary border-opacity-25">
                         <div class="modal-header border-secondary border-opacity-25">
-                            <h5 class="modal-title">${title}</h5>
-                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            <h5 class="modal-title" id="ruleModalTitle">${title}</h5>
+                            <button type="button" class="btn-close" data-close-modal="ruleModal" aria-label="Fechar"></button>
                         </div>
                         <div class="modal-body">
                             <div class="mb-3">
@@ -900,7 +935,7 @@ document.addEventListener("DOMContentLoaded", function () {
                             </div>
                         </div>
                         <div class="modal-footer border-secondary border-opacity-25">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-secondary" data-close-modal="ruleModal">Cancelar</button>
                             <button type="button" class="btn btn-jupiter" onclick="saveScheduleRule(${index})">Salvar</button>
                         </div>
                     </div>
@@ -908,18 +943,29 @@ document.addEventListener("DOMContentLoaded", function () {
             </div>
         `;
 
-        // Remove old modal if exists
         const oldModal = document.getElementById("ruleModal");
         if (oldModal) {
             oldModal.remove();
         }
 
-        // Add new modal
         document.body.insertAdjacentHTML("beforeend", modal);
+        const modalElement = document.getElementById("ruleModal");
+        modalElement.querySelectorAll("[data-close-modal]").forEach(button => {
+            button.addEventListener("click", closeRuleModal);
+        });
+        modalElement.addEventListener("click", event => {
+            if (event.target === modalElement) {
+                closeRuleModal();
+            }
+        });
+        document.getElementById("ruleId").focus();
+    }
 
-        // Show modal
-        const ruleModal = new bootstrap.Modal(document.getElementById("ruleModal"));
-        ruleModal.show();
+    function closeRuleModal() {
+        const modal = document.getElementById("ruleModal");
+        if (modal) {
+            modal.remove();
+        }
     }
 
     function saveScheduleRule(index) {
@@ -970,12 +1016,8 @@ document.addEventListener("DOMContentLoaded", function () {
             scheduleData.rules[index] = newRule;
         }
 
-        // Close modal and save
-        bootstrap.Modal.getInstance(document.getElementById("ruleModal")).hide();
-        setTimeout(() => {
-            document.getElementById("ruleModal").remove();
-            saveScheduleConfig();
-        }, 300);
+        closeRuleModal();
+        saveScheduleConfig();
     }
 
     window.saveScheduleRule = saveScheduleRule;
@@ -990,6 +1032,7 @@ document.addEventListener("DOMContentLoaded", function () {
     async function saveScheduleConfig() {
         try {
             scheduleData = normalizeScheduleData(scheduleData);
+            scheduleLoaded = true;
             setScheduleSaveStatus("salvando", "warning");
             const response = await fetch("/cgi-bin/relay-schedule", {
                 method: "POST",
@@ -1016,25 +1059,56 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
+    async function ensureScheduleLoaded() {
+        if (!scheduleLoaded) {
+            await fetchScheduleConfig();
+        }
+        return scheduleLoaded;
+    }
+
     const schedulerEnabled = document.getElementById("scheduler-enabled");
     const scheduleAddBtn = document.getElementById("schedule-add-btn");
     const scheduleRefreshBtn = document.getElementById("schedule-refresh-btn");
 
     if (schedulerEnabled) {
-        schedulerEnabled.addEventListener("change", updateSchedulerState);
+        schedulerEnabled.addEventListener("change", async () => {
+            if (await ensureScheduleLoaded()) {
+                updateSchedulerState();
+            }
+        });
     }
     if (scheduleAddBtn) {
-        scheduleAddBtn.addEventListener("click", addScheduleRule);
+        scheduleAddBtn.addEventListener("click", async () => {
+            if (await ensureScheduleLoaded()) {
+                addScheduleRule();
+            }
+        });
     }
     if (scheduleRefreshBtn) {
         scheduleRefreshBtn.addEventListener("click", fetchScheduleConfig);
     }
 
-    // Load schedule on startup
-    fetchScheduleConfig();
+    renderScheduleRules();
 
-    setInterval(fetchUptime, 60000);
-    setInterval(fetchCpuTemperature, 10000);
-    setInterval(fetchTelemetry, 10000);
-    setInterval(fetchRssi, 10000);
+    startPoller(fetchNavbarInfo, POLL_INTERVALS.slow);
+    startPoller(fetchUptime, POLL_INTERVALS.slow);
+    startPoller(fetchTraffic, POLL_INTERVALS.slow);
+    startPoller(fetchCpuTemperature, POLL_INTERVALS.quick);
+    startPoller(fetchTelemetry, POLL_INTERVALS.slow);
+    startPoller(fetchRssi, POLL_INTERVALS.quick);
+    startPoller(fetchAds1015, POLL_INTERVALS.quick);
+    startPoller(fetchVinStatus, POLL_INTERVALS.quick);
+    startPoller(fetchRelays, POLL_INTERVALS.quick);
+    startPoller(fetchStatusVpn, POLL_INTERVALS.slow);
+
+    document.addEventListener("visibilitychange", () => {
+        if (document.hidden) return;
+        pollers.forEach(run => run(true));
+    });
+
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape") {
+            closeRuleModal();
+        }
+    });
 });

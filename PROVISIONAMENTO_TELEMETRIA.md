@@ -85,6 +85,9 @@ Esse comando grava:
 - `/home/proc/mqtt.json`
 - `/home/proc/secrets.env`
 
+Ao concluir, o provisionamento reinicia somente o monitor MQTT para aplicar as
+novas credenciais. Os demais serviços continuam funcionando normalmente.
+
 Depois do comando, confira:
 
 ```sh
@@ -323,7 +326,14 @@ configuracao.
 
 ## 7. Reiniciar servicos
 
-Depois de provisionar e validar:
+O `jupiter-provision` reinicia o monitor automaticamente. Para reiniciá-lo
+manualmente sem interromper os outros serviços, use:
+
+```sh
+jupiter-services restart-monitor
+```
+
+Para reiniciar todos os serviços, use:
 
 ```sh
 jupiter-services restart

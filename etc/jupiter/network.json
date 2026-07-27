@@ -3,7 +3,7 @@
   "lan": {
     "enabled": false,
     "interface": "eth0",
-    "addresses": []
+    "addresses": [""]
   },
   "lte": {
     "enabled": false,

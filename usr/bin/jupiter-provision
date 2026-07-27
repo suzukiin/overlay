@@ -131,3 +131,9 @@ mv "$tmp_mqtt" /home/proc/mqtt.json
 
 chmod 600 /home/proc/secrets.env
 jupiter_log provision "provisioned device_id=$device_id tenant=$tenant site=$site_id mqtt=$mqtt_host:$mqtt_port"
+
+if [ -x /usr/bin/jupiter-services ]; then
+    /usr/bin/jupiter-services restart-monitor
+fi
+
+echo "Provisioning complete. MQTT monitor restarted."

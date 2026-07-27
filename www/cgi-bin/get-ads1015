@@ -58,12 +58,12 @@ read_channel() {
             if (percent > 100) percent = 100
             printf "%.0f", percent
         }')"
-        printf '{"channel":%s,"role":"battery","raw":%s,"kernel_scale":%s,"ads_voltage":%s,"divider_ratio":%s,"divider_r1_ohm":%s,"divider_r2_ohm":%s,"voltage":%s,"unit":"V","battery_percent":%s,"battery_min_voltage":%s,"battery_max_voltage":%s}' \
-            "$channel" "$raw" "$kernel_scale" "$ads_voltage" "$DIVIDER_RATIO" "$DIVIDER_R1_OHM" "$DIVIDER_R2_OHM" "$input_voltage" \
+        printf '{"channel":%s,"role":"battery","raw":%s,"kernel_scale":%s,"ads_voltage":%s,"voltage":%s,"unit":"V","battery_percent":%s,"battery_min_voltage":%s,"battery_max_voltage":%s}' \
+            "$channel" "$raw" "$kernel_scale" "$ads_voltage" "$input_voltage" \
             "$battery_percent" "$BATTERY_MIN_V" "$BATTERY_MAX_V"
     else
-        printf '{"channel":%s,"role":"analog_input","raw":%s,"kernel_scale":%s,"ads_voltage":%s,"divider_ratio":%s,"divider_r1_ohm":%s,"divider_r2_ohm":%s,"voltage":%s,"unit":"V"}' \
-            "$channel" "$raw" "$kernel_scale" "$ads_voltage" "$DIVIDER_RATIO" "$DIVIDER_R1_OHM" "$DIVIDER_R2_OHM" "$input_voltage"
+        printf '{"channel":%s,"role":"analog_input","raw":%s,"kernel_scale":%s,"ads_voltage":%s,"voltage":%s,"unit":"V"}' \
+            "$channel" "$raw" "$kernel_scale" "$ads_voltage" "$input_voltage"
     fi
 }
 

@@ -1,19 +1,11 @@
 <!DOCTYPE html>
-<html lang="pt-BR" data-bs-theme="dark">
+<html lang="pt-BR">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JUPITER | Telemetry System</title>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap"
-        rel="stylesheet">
-
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="public/style.css">
 </head>
 
@@ -62,7 +54,7 @@
                     <div class="btn-toolbar mb-2 mb-md-0">
                         <div class="btn-group me-2">
                             <button type="button" class="btn btn-sm btn-outline-secondary font-mono"
-                                onclick="fetchLogs()">Exportar Logs</button>
+                                onclick="fetchLogs()">Carregar Logs</button>
                         </div>
                     </div>
                 </div>
@@ -299,7 +291,7 @@
                         <h4 class="h5 text-light mb-0 d-flex align-items-center">
                             <i class="bi bi-clock-history me-2 text-secondary"></i> Gerenciador de Tarefas
                         </h4>
-                        <span class="badge bg-dark border border-secondary text-secondary font-mono" id="schedule-save-status">--</span>
+                        <span class="badge bg-dark border border-secondary text-secondary font-mono" id="schedule-save-status">sob demanda</span>
                     </div>
 
                     <div class="scheduler-panel">
@@ -310,7 +302,7 @@
                                     <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 font-mono"
                                         id="scheduler-status-badge">OFF</span>
                                 </div>
-                                <div class="text-muted small font-mono" id="scheduler-summary">0 regras configuradas</div>
+                                <div class="text-muted small font-mono" id="scheduler-summary">Use Atualizar para carregar as regras</div>
                             </div>
 
                             <div class="scheduler-actions">
@@ -328,9 +320,9 @@
                         </div>
 
                         <div id="schedule-rules-container" class="scheduler-table-wrap">
-                            <div class="text-center text-muted py-4">
-                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                Carregando regras...
+                            <div class="scheduler-empty">
+                                <i class="bi bi-calendar2-x text-secondary fs-4"></i>
+                                <span>Agenda não carregada</span>
                             </div>
                         </div>
                     </div>
@@ -355,9 +347,7 @@
                         <tbody id="logs-body">
                             <tr>
                                 <td colspan="4" class="text-center text-muted py-3">
-                                    <span class="spinner-border spinner-border-sm me-2" role="status"
-                                        aria-hidden="true"></span>
-                                    Conectando ao host de telemetria...
+                                    Logs sob demanda. Clique em Carregar Logs.
                                 </td>
                             </tr>
                         </tbody>
@@ -368,7 +358,6 @@
     </div>
 
     <script src="public/javascript.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 
 </html>
