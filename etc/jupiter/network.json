@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "lan": {
-    "enabled": false,
+    "enabled": true,
     "interface": "eth0",
-    "addresses": [""]
+    "addresses": ["192.168.1.100/24"]
   },
   "lte": {
     "enabled": false,
@@ -12,7 +12,7 @@
     "device": "",
     "health_targets": [],
     "check_interval_seconds": 60,
-    "startup_wait_seconds": 30
+    "startup_wait_seconds": 90
   },
   "vpn": {
     "interface": "",

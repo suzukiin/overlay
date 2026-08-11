@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "polling_interval": 300,
+  "polling_interval": 60,
   "snmp_community": "public",
   "identity_file": "/etc/jupiter/device.json",
   "hardware_file": "/etc/jupiter/hardware.json",

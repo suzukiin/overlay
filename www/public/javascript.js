@@ -1,7 +1,8 @@
 document.addEventListener("DOMContentLoaded", function () {
     const POLL_INTERVALS = {
-        quick: 60000,
-        slow: 300000
+        quick: 120000,
+        slow: 600000,
+        telemetry: 900000
     };
 
     const pollers = [];
@@ -1094,7 +1095,7 @@ document.addEventListener("DOMContentLoaded", function () {
     startPoller(fetchUptime, POLL_INTERVALS.slow);
     startPoller(fetchTraffic, POLL_INTERVALS.slow);
     startPoller(fetchCpuTemperature, POLL_INTERVALS.quick);
-    startPoller(fetchTelemetry, POLL_INTERVALS.slow);
+    startPoller(fetchTelemetry, POLL_INTERVALS.telemetry);
     startPoller(fetchRssi, POLL_INTERVALS.quick);
     startPoller(fetchAds1015, POLL_INTERVALS.quick);
     startPoller(fetchVinStatus, POLL_INTERVALS.quick);

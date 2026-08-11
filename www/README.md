@@ -15,5 +15,5 @@ em `/etc/jupiter` e `/home/proc`; ela não é duplicada na raiz web.
 
 A interface é servida sem CDNs, fontes externas ou Bootstrap remoto para evitar
 downloads pela conexão celular. As atualizações automáticas usam intervalos de
-60 segundos para leituras locais e 5 minutos para telemetria/tráfego; logs e
-agendamento são carregados apenas sob demanda.
+2 minutos para leituras locais e 10 minutos para telemetria/tráfego; logs e
+agendamento continuam sendo carregados apenas sob demanda.
