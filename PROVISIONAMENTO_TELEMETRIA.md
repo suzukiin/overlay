@@ -33,6 +33,7 @@ flowchart TD
 | `/home/proc/virtual_inputs.json` | Equipamentos e OIDs SNMP | No provisionamento ou pelo backend |
 | `/etc/jupiter/network.json` | LAN, LTE, VPN e NAT | Somente se o destino precisar |
 | `/etc/jupiter/telemetry.json` | Intervalo de coleta e caminhos dos arquivos | Normalmente fica igual |
+| `/etc/jupiter/tv.json` | Adaptador DVB, frequências e diretórios da pré-visualização | Se a TV digital for usada |
 
 Arquivos antigos que nao devem ser usados como fonte de configuracao:
 
@@ -416,3 +417,106 @@ dev/monitor.c
 
 Depois de recompilar para a arquitetura da placa, substitua o binario no overlay
 antes de gerar a nova imagem.
+
+## 12. Pré-visualização de TV ISDB-T
+
+O overlay inclui suporte ao MyGica S270, que usa o receptor Siano Rio. O
+firmware `isdbt_rio.inp` é instalado em `/lib/firmware` e os módulos DVB do
+kernel precisam criar pelo menos:
+
+```text
+/dev/dvb/adapter0/frontend0
+/dev/dvb/adapter0/dvr0
+```
+
+Também são necessários na imagem:
+
+- `dvbv5-scan`;
+- `dvbv5-zap`;
+- `ffmpeg` com muxer HLS, encoder H.264 (`libx264`) e AAC;
+- suporte ao driver `smsusb`/`smsdvb` no kernel ou como módulos.
+
+No Buildroot, habilite pelo menos:
+
+```text
+BR2_PACKAGE_FFMPEG=y
+BR2_PACKAGE_FFMPEG_FFMPEG=y
+BR2_PACKAGE_FFMPEG_GPL=y
+BR2_PACKAGE_X264=y
+```
+
+Os encoders, filtros, demuxers, muxers e o encoder AAC usados pela imagem
+também precisam permanecer habilitados. A confirmação no equipamento é:
+
+```sh
+ffmpeg -hide_banner -encoders | grep libx264
+```
+
+Confira a configuração em `/etc/jupiter/tv.json`:
+
+```json
+{
+  "enabled": true,
+  "adapter": 0,
+  "frontend": 0,
+  "scan_input_file": "/usr/share/dvbv5/isdb-t/br-Brazil",
+  "segment_seconds": 2,
+  "playlist_size": 6,
+  "sample_seconds": 15,
+  "sample_width": 640,
+  "sample_height": 360,
+  "sample_video_bitrate": "450k",
+  "sample_audio_bitrate": "64k"
+}
+```
+
+O arquivo inicial deve conter as frequências ISDB-T da região. O pacote
+`dtv-scan-tables` normalmente fornece arquivos como `br-Brazil` e variantes
+municipais. Depois de conectar a antena e o dongle:
+
+```sh
+ls -l /dev/dvb/adapter0
+jupiter-services restart
+curl http://127.0.0.1/cgi-bin/tv-status
+curl -X POST http://127.0.0.1/cgi-bin/tv-scan
+cat /var/lib/jupiter/tv/channels.json
+```
+
+A página local lista somente serviços com `VIDEO_PID`. Para iniciar uma amostra
+compactada de 15 segundos em 640×360, use a interface web ou, para diagnóstico:
+
+```sh
+curl -X POST 'http://127.0.0.1/cgi-bin/tv-select?channel_id=ch-001'
+curl http://127.0.0.1/cgi-bin/tv-status
+curl -X POST http://127.0.0.1/cgi-bin/tv-stop
+```
+
+O controlador mantém uma única captura ativa. Ao selecionar outro canal, a
+captura anterior é encerrada e uma nova sessão HLS VOD é criada em
+`/www/public/tv`. A amostra é encerrada automaticamente após
+`sample_seconds`; os segmentos ficam disponíveis somente para a sessão atual e
+são removidos ao iniciar outra amostra ou pressionar `Parar`.
+
+Ao selecionar um canal na página, os metadados encontrados na varredura são
+exibidos: `SERVICE_ID`, frequência e PIDs de vídeo e áudio. Para economizar
+dados, a amostra é redimensionada e recodificada para H.264/AAC conforme os
+parâmetros acima; não há transmissão contínua nem gravação permanente.
+
+Diagnóstico rápido:
+
+```sh
+cat /var/lib/jupiter/tv/state.json
+tail -f /var/log/jupiter/tv.log
+ps | grep -E 'jupiter-tv|dvbv5-zap|ffmpeg'
+```
+
+Estados comuns:
+
+- `tuner_present=false`: driver, firmware, USB ou nós DVB não estão disponíveis;
+- `scan_state=error`: o arquivo de frequências não existe, não houve lock ou não
+  foram encontrados serviços de vídeo;
+- `stream_state=capturing`: a amostra está sendo gravada e compactada;
+- `stream_state=ready`: a playlist VOD foi finalizada e pode ser reproduzida;
+- `stream_state=error`: o processo do FFmpeg ou do `dvbv5-zap` encerrou;
+- playlist vazia no navegador: confira suporte aos codecs transmitidos e abra
+  o console do navegador.

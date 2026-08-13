@@ -1,0 +1,290 @@
+#!/bin/sh
+
+set -u
+
+COMMON="${JUPITER_TV_COMMON:-/usr/bin/jupiter-tv-common}"
+if [ ! -f "$COMMON" ]; then
+    COMMON="$(dirname "$0")/jupiter-tv-common"
+fi
+. "$COMMON"
+
+tv_ensure_dirs
+
+if [ "$TV_ENABLED" != "true" ]; then
+    jupiter_log tv "disabled by configuration"
+    exit 0
+fi
+
+date_now() {
+    date -u '+%Y-%m-%dT%H:%M:%SZ'
+}
+
+tuner_present() {
+    [ -e "$TV_DVB_ROOT/adapter${TV_ADAPTER}/frontend${TV_FRONTEND}" ] && \
+        [ -e "$TV_DVB_ROOT/adapter${TV_ADAPTER}/dvr0" ]
+}
+
+try_load_driver() {
+    tuner_present && return 0
+    if command -v modprobe >/dev/null 2>&1; then
+        modprobe smsusb >/dev/null 2>&1 || true
+        modprobe smsdvb >/dev/null 2>&1 || true
+    fi
+}
+
+parse_scan_channels() {
+    input_file="$1"
+    output_tsv="$2"
+
+    awk '
+    function trim(value) {
+        sub(/^[[:space:]]+/, "", value)
+        sub(/[[:space:]]+$/, "", value)
+        return value
+    }
+    function field_value(line, value) {
+        value = line
+        sub(/^[^=]*=[[:space:]]*/, "", value)
+        return trim(value)
+    }
+    function emit() {
+        if (name != "" && video != "" && video != "0") {
+            printf "%s\t%s\t%s\t%s\t%s\n", name, service, frequency, video, audio
+        }
+    }
+        /^\[/ {
+        emit()
+        name = $0
+        sub(/^\[/, "", name)
+        sub(/\][[:space:]]*$/, "", name)
+        service = ""
+        frequency = ""
+        video = ""
+        audio = ""
+        next
+    }
+    /^[[:space:]]*SERVICE_ID[[:space:]]*=/ { service = field_value($0); next }
+    /^[[:space:]]*FREQUENCY[[:space:]]*=/ { frequency = field_value($0); next }
+    /^[[:space:]]*VIDEO_PID[[:space:]]*=/ { video = field_value($0); next }
+    /^[[:space:]]*AUDIO_PID[[:space:]]*=/ { audio = field_value($0); next }
+    END { emit() }
+    ' "$input_file" > "$output_tsv"
+
+    [ -s "$output_tsv" ]
+}
+
+make_channels_json() {
+    source_tsv="$1"
+    output_json="$2"
+    temp_json="$output_json.tmp.$$"
+    index=0
+    first=true
+
+    {
+        printf '{"schema_version":1,"channels":['
+        while IFS="	" read -r name service frequency video audio; do
+            [ -n "$name" ] || continue
+            index=$((index + 1))
+            if [ "$first" = true ]; then
+                first=false
+            else
+                printf ','
+            fi
+            printf '{"id":"ch-%03d","name":"%s","service_id":"%s","frequency":"%s","video_pid":"%s","audio_pid":"%s"}' \
+                "$index" "$(tv_json_escape "$name")" "$(tv_json_escape "$service")" \
+                "$(tv_json_escape "$frequency")" "$(tv_json_escape "$video")" "$(tv_json_escape "$audio")"
+        done < "$source_tsv"
+        printf ']}\n'
+    } > "$temp_json" && mv "$temp_json" "$output_json"
+
+    printf '%s\n' "$index"
+}
+
+find_channel() {
+    channel_id="$1"
+    case "$channel_id" in
+        ch-[0-9][0-9][0-9]) ;;
+        *) return 1 ;;
+    esac
+
+    number="${channel_id#ch-}"
+    number="$(printf '%s' "$number" | sed 's/^0*//')"
+    [ -n "$number" ] || number=0
+    case "$number" in
+        *[!0-9]*) return 1 ;;
+    esac
+    [ "$number" -gt 0 ] || return 1
+    sed -n "${number}p" "$TV_CHANNELS_TSV" 2>/dev/null
+}
+
+stop_stream() {
+    stream_state="$(tv_state_string stream_state)"
+    stream_pid=""
+    if [ -r "$TV_STREAM_PID" ]; then
+        stream_pid="$(cat "$TV_STREAM_PID" 2>/dev/null)"
+    fi
+
+    case "$stream_pid" in
+        ''|*[!0-9]*) ;;
+        *) kill "$stream_pid" 2>/dev/null || true ;;
+    esac
+
+    sleep 1
+    rm -f "$TV_STREAM_PID"
+
+    manifest="$(tv_state_string manifest)"
+    case "$manifest" in
+        /public/tv/*/index.m3u8)
+            session_dir="$TV_WEB_ROOT/${manifest#/public/tv/}"
+            session_dir="${session_dir%/index.m3u8}"
+            case "$session_dir" in
+                "$TV_WEB_ROOT"/*) rm -rf "$session_dir" ;;
+            esac
+            ;;
+    esac
+
+    tv_write_state "$(tv_state_string scan_state)" "idle" "" "" "" "" "" \
+        "$(tv_state_string scan_started_at)" "$(tv_state_string scan_finished_at)"
+}
+
+start_stream() {
+    channel_id="$1"
+    channel_line="$(find_channel "$channel_id")" || {
+        jupiter_log tv "invalid channel id=$channel_id"
+        return 1
+    }
+
+    IFS="	" read -r channel_name service frequency video audio <<EOF
+$channel_line
+EOF
+    [ -n "$channel_name" ] || return 1
+
+    stop_stream
+
+    session_id="$(date +%s)-$$"
+    session_dir="$TV_WEB_ROOT/$session_id"
+    input_fifo="$TV_RUN_DIR/input-$session_id.fifo"
+    mkdir -p "$session_dir"
+
+    "$TV_CAPTURE_BIN" "$channel_name" "$TV_CHANNELS_FILE" "$TV_ADAPTER" \
+        "$TV_FRONTEND" "$session_dir" "$input_fifo" "$TV_SEGMENT_SECONDS" \
+        "$TV_PLAYLIST_SIZE" "$TV_SAMPLE_SECONDS" "$TV_SAMPLE_WIDTH" \
+        "$TV_SAMPLE_HEIGHT" "$TV_SAMPLE_VIDEO_BITRATE" \
+        "$TV_SAMPLE_AUDIO_BITRATE" >> "$TV_LOG" 2>&1 &
+    stream_pid="$!"
+    echo "$stream_pid" > "$TV_STREAM_PID"
+
+    tv_write_state "$(tv_state_string scan_state)" "capturing" "$channel_id" "$channel_name" \
+        "/public/tv/$session_id/index.m3u8" "$stream_pid" "" \
+        "$(tv_state_string scan_started_at)" "$(tv_state_string scan_finished_at)"
+    jupiter_log tv "sample started channel=$channel_id name=$channel_name duration=${TV_SAMPLE_SECONDS}s resolution=${TV_SAMPLE_WIDTH}x${TV_SAMPLE_HEIGHT} pid=$stream_pid"
+}
+
+run_scan() {
+    scan_started="$(date_now)"
+    temp_channels="$TV_CHANNELS_FILE.tmp.$$"
+    temp_tsv="$TV_CHANNELS_TSV.tmp.$$"
+
+    trap 'rm -f "$TV_SCAN_PID" "$temp_channels" "$temp_tsv"; exit 1' INT TERM EXIT
+
+    tv_write_state "running" "idle" "" "" "" "" "" "$scan_started" ""
+    jupiter_log tv "scan started input=$TV_SCAN_INPUT adapter=$TV_ADAPTER frontend=$TV_FRONTEND"
+
+    if [ ! -r "$TV_SCAN_INPUT" ]; then
+        tv_write_state "error" "idle" "" "" "" "" "scan input not found: $TV_SCAN_INPUT" \
+            "$scan_started" "$(date_now)"
+        rm -f "$temp_channels" "$temp_tsv"
+        return 1
+    fi
+
+    if ! tuner_present; then
+        tv_write_state "error" "idle" "" "" "" "" "DVB tuner not found" "$scan_started" "$(date_now)"
+        rm -f "$temp_channels" "$temp_tsv"
+        return 1
+    fi
+
+    if ! dvbv5-scan -a "$TV_ADAPTER" -f "$TV_FRONTEND" -N -G -o "$temp_channels" \
+        "$TV_SCAN_INPUT" >> "$TV_LOG" 2>&1; then
+        tv_write_state "error" "idle" "" "" "" "" "channel scan failed" "$scan_started" "$(date_now)"
+        rm -f "$temp_channels" "$temp_tsv"
+        return 1
+    fi
+
+    if ! parse_scan_channels "$temp_channels" "$temp_tsv"; then
+        tv_write_state "error" "idle" "" "" "" "" "no video services found" "$scan_started" "$(date_now)"
+        rm -f "$temp_channels" "$temp_tsv"
+        return 1
+    fi
+
+    mv "$temp_channels" "$TV_CHANNELS_FILE"
+    mv "$temp_tsv" "$TV_CHANNELS_TSV"
+    channel_total="$(make_channels_json "$TV_CHANNELS_TSV" "$TV_CHANNELS_JSON")"
+    scan_finished="$(date_now)"
+    tv_write_state "idle" "idle" "" "" "" "" "" "$scan_started" "$scan_finished"
+    jupiter_log tv "scan finished channels=$channel_total"
+    rm -f "$TV_SCAN_PID"
+    trap - INT TERM EXIT
+}
+
+start_scan() {
+    tv_process_running "$TV_SCAN_PID" && return 0
+    stop_stream
+    echo "starting" > "$TV_SCAN_PID.state"
+    run_scan &
+    echo "$!" > "$TV_SCAN_PID"
+    rm -f "$TV_SCAN_PID.state"
+}
+
+handle_command() {
+    command="$1"
+    argument="${2:-}"
+
+    case "$command" in
+        scan)
+            if tv_process_running "$TV_SCAN_PID"; then
+                jupiter_log tv "scan ignored; already running"
+            else
+                start_scan
+            fi
+            ;;
+        select)
+            if tv_process_running "$TV_SCAN_PID"; then
+                jupiter_log tv "select ignored; scan running channel=$argument"
+            else
+                start_stream "$argument" || true
+            fi
+            ;;
+        stop)
+            stop_stream
+            ;;
+        *)
+            jupiter_log tv "unknown command=$command"
+            ;;
+    esac
+}
+
+try_load_driver
+
+case "$(tv_state_string stream_state)" in
+    running|capturing|ready) stop_stream ;;
+esac
+
+if [ ! -p "$TV_CONTROL_FIFO" ]; then
+    rm -f "$TV_CONTROL_FIFO"
+    mkfifo "$TV_CONTROL_FIFO" || exit 1
+fi
+
+echo "$$" > "$TV_CONTROLLER_PID"
+trap 'stop_stream; rm -f "$TV_CONTROLLER_PID" "$TV_CONTROL_FIFO"; exit 0' INT TERM EXIT
+
+if ! tuner_present; then
+    jupiter_log tv "started without tuner adapter=$TV_ADAPTER frontend=$TV_FRONTEND"
+else
+    jupiter_log tv "started tuner adapter=$TV_ADAPTER frontend=$TV_FRONTEND"
+fi
+
+exec 3<> "$TV_CONTROL_FIFO"
+while IFS=" " read -r command argument <&3; do
+    [ -n "${command:-}" ] || continue
+    handle_command "$command" "$argument"
+done

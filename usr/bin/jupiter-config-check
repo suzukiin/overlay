@@ -7,6 +7,7 @@ MQTT_FILE="/home/proc/mqtt.json"
 TELEMETRY_FILE="/etc/jupiter/telemetry.json"
 HARDWARE_FILE="/etc/jupiter/hardware.json"
 NETWORK_FILE="/etc/jupiter/network.json"
+TV_FILE="/etc/jupiter/tv.json"
 INFO_FILE="/home/proc/info.json"
 INPUTS_FILE="/home/proc/virtual_inputs.json"
 SECRETS_FILE="/home/proc/secrets.env"
@@ -27,6 +28,13 @@ json_get_number() {
     key="$2"
     [ -f "$file" ] || return 0
     sed -n 's/.*"'$key'"[[:space:]]*:[[:space:]]*\([-0-9.][0-9.]*\).*/\1/p' "$file" | head -n 1
+}
+
+json_get_bool() {
+    file="$1"
+    key="$2"
+    [ -f "$file" ] || return 0
+    sed -n 's/.*"'"$key"'"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' "$file" | head -n 1
 }
 
 json_get_bool_in_object() {
@@ -79,6 +87,7 @@ require_file "$MQTT_FILE"
 require_file "$TELEMETRY_FILE"
 require_file "$HARDWARE_FILE"
 require_file "$NETWORK_FILE"
+require_file "$TV_FILE"
 require_file "$INFO_FILE"
 require_file "$INPUTS_FILE"
 
@@ -96,6 +105,11 @@ lte_peer="$(json_get_string_in_object "$NETWORK_FILE" lte peer)"
 lte_device="$(json_get_string_in_object "$NETWORK_FILE" lte device)"
 lte_chat_file="$(json_get_string_in_object "$NETWORK_FILE" lte chat_file)"
 lte_peer_file="/etc/ppp/peers/$lte_peer"
+tv_enabled="$(json_get_bool "$TV_FILE" enabled)"
+tv_scan_input="$(json_get_string "$TV_FILE" scan_input_file)"
+tv_sample_seconds="$(json_get_number "$TV_FILE" sample_seconds)"
+tv_sample_width="$(json_get_number "$TV_FILE" sample_width)"
+tv_sample_height="$(json_get_number "$TV_FILE" sample_height)"
 
 monitor_ready() {
     [ -n "$device_id" ] || return 1
@@ -171,6 +185,14 @@ if [ "$lte_enabled" = "true" ]; then
     [ -z "$lte_chat_file" ] || [ -f "$lte_chat_file" ] || warn "chat LTE ausente: $lte_chat_file"
     [ -z "$lte_peer" ] || [ ! -f "$lte_peer_file" ] || peer_file_contains "$lte_peer_file" "$lte_device" || warn "peer LTE nao referencia device do network.json: $lte_device"
     [ -z "$lte_peer" ] || [ ! -f "$lte_peer_file" ] || peer_file_contains "$lte_peer_file" "$lte_chat_file" || warn "peer LTE nao referencia chat_file do network.json: $lte_chat_file"
+fi
+
+if [ "$tv_enabled" = "true" ]; then
+    [ -n "$tv_scan_input" ] || warn "TV habilitada sem scan_input_file em $TV_FILE"
+    [ -z "$tv_scan_input" ] || [ -f "$tv_scan_input" ] || warn "arquivo inicial de frequencias TV ausente: $tv_scan_input"
+    [ -n "$tv_sample_seconds" ] || warn "TV habilitada sem sample_seconds em $TV_FILE"
+    [ -n "$tv_sample_width" ] || warn "TV habilitada sem sample_width em $TV_FILE"
+    [ -n "$tv_sample_height" ] || warn "TV habilitada sem sample_height em $TV_FILE"
 fi
 
 if [ -f "$INPUTS_FILE" ] && ! grep -q '"equipamentos"' "$INPUTS_FILE"; then

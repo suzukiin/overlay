@@ -1,0 +1,4 @@
+#!/bin/sh
+
+SCRIPT_DIR="$(dirname "$0")"
+QUERY_STRING="action=select&${QUERY_STRING:-}" REQUEST_METHOD=POST exec "$SCRIPT_DIR/tv-control"

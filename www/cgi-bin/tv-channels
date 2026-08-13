@@ -1,0 +1,18 @@
+#!/bin/sh
+
+COMMON="${JUPITER_TV_COMMON:-/usr/bin/jupiter-tv-common}"
+if [ ! -f "$COMMON" ]; then
+    COMMON="$(dirname "$0")/../../usr/bin/jupiter-tv-common"
+fi
+. "$COMMON"
+
+printf 'Content-Type: application/json\r\n\r\n'
+tv_ensure_dirs
+
+if [ -r "$TV_CHANNELS_JSON" ]; then
+    printf '{"status":"Success","data":'
+    cat "$TV_CHANNELS_JSON"
+    printf '}\n'
+else
+    printf '{"status":"Success","data":{"schema_version":1,"channels":[]}}\n'
+fi

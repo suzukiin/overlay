@@ -1,0 +1,84 @@
+#!/bin/sh
+
+COMMON="${JUPITER_TV_COMMON:-/usr/bin/jupiter-tv-common}"
+if [ ! -f "$COMMON" ]; then
+    COMMON="$(dirname "$0")/../../usr/bin/jupiter-tv-common"
+fi
+. "$COMMON"
+
+printf 'Content-Type: application/json\r\n\r\n'
+
+tv_ensure_dirs
+
+if [ "${REQUEST_METHOD:-GET}" != "POST" ]; then
+    printf '{"status":"Error","msg":"Method not allowed"}\n'
+    exit 0
+fi
+
+action=""
+channel_id=""
+for item in $(printf '%s' "${QUERY_STRING:-}" | tr '&' ' '); do
+    case "$item" in
+        action=*) action="${item#action=}" ;;
+        channel_id=*) channel_id="${item#channel_id=}" ;;
+    esac
+done
+
+case "$action" in
+    scan|stop)
+        ;;
+    select)
+        case "$channel_id" in
+            ch-[0-9][0-9][0-9]) ;;
+            *) printf '{"status":"Error","msg":"Invalid channel_id"}\n'; exit 0 ;;
+        esac
+        ;;
+    *)
+        printf '{"status":"Error","msg":"Invalid action"}\n'
+        exit 0
+        ;;
+esac
+
+lock_dir="$TV_RUN_DIR/cgi.lock"
+if ! mkdir "$lock_dir" 2>/dev/null; then
+    printf '{"status":"Error","msg":"Another TV operation is in progress"}\n'
+    exit 0
+fi
+trap 'rmdir "$lock_dir" 2>/dev/null || true' EXIT INT TERM
+
+if ! tv_controller_running; then
+    printf '{"status":"Error","msg":"TV controller is not running"}\n'
+    exit 0
+fi
+
+case "$action" in
+    scan)
+        if tv_process_running "$TV_SCAN_PID"; then
+            printf '{"status":"Error","msg":"Scan already in progress"}\n'
+            exit 0
+        fi
+        tv_send_command scan || {
+            printf '{"status":"Error","msg":"Could not start scan"}\n'
+            exit 0
+        }
+        printf '{"status":"Success","msg":"Scan started"}\n'
+        ;;
+    select)
+        if tv_process_running "$TV_SCAN_PID"; then
+            printf '{"status":"Error","msg":"Scan in progress"}\n'
+            exit 0
+        fi
+        tv_send_command "select $channel_id" || {
+            printf '{"status":"Error","msg":"Could not start stream"}\n'
+            exit 0
+        }
+        printf '{"status":"Success","msg":"Stream starting"}\n'
+        ;;
+    stop)
+        tv_send_command stop || {
+            printf '{"status":"Error","msg":"Could not stop stream"}\n'
+            exit 0
+        }
+        printf '{"status":"Success","msg":"Stream stopped"}\n'
+        ;;
+esac

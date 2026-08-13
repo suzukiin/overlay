@@ -1,0 +1,207 @@
+#!/bin/sh
+
+COMMON="${JUPITER_COMMON:-/usr/bin/jupiter-common}"
+if [ ! -f "$COMMON" ]; then
+    COMMON="$(dirname "$0")/jupiter-common"
+fi
+
+. "$COMMON"
+
+JUPITER_TV_CONFIG="${JUPITER_TV_CONFIG:-$JUPITER_ETC/tv.json}"
+TV_SCHEMA_VERSION=1
+TV_DEFAULT_RUN_DIR="${JUPITER_RUN}/tv"
+TV_DEFAULT_STATE_DIR="/var/lib/jupiter/tv"
+TV_DEFAULT_WEB_ROOT="/www/public/tv"
+
+tv_json_string() {
+    file="$1"
+    key="$2"
+
+    [ -r "$file" ] || return 0
+
+    if command -v jq >/dev/null 2>&1; then
+        jq -r --arg key "$key" '.[$key] // empty' "$file" 2>/dev/null
+        return 0
+    fi
+
+    sed -n 's/.*"'"$key"'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$file" | head -n 1
+}
+
+tv_json_number() {
+    file="$1"
+    key="$2"
+
+    [ -r "$file" ] || return 0
+
+    if command -v jq >/dev/null 2>&1; then
+        jq -r --arg key "$key" '.[$key] // empty' "$file" 2>/dev/null
+        return 0
+    fi
+
+    sed -n 's/.*"'"$key"'"[[:space:]]*:[[:space:]]*\([-0-9.][0-9.]*\).*/\1/p' "$file" | head -n 1
+}
+
+tv_json_bool() {
+    file="$1"
+    key="$2"
+
+    [ -r "$file" ] || return 0
+
+    if command -v jq >/dev/null 2>&1; then
+        jq -r --arg key "$key" '.[$key] // empty' "$file" 2>/dev/null
+        return 0
+    fi
+
+    sed -n 's/.*"'"$key"'"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' "$file" | head -n 1
+}
+
+tv_load_config() {
+    TV_ENABLED="$(tv_json_bool "$JUPITER_TV_CONFIG" enabled)"
+    TV_ADAPTER="$(tv_json_number "$JUPITER_TV_CONFIG" adapter)"
+    TV_FRONTEND="$(tv_json_number "$JUPITER_TV_CONFIG" frontend)"
+    TV_DVB_ROOT="$(tv_json_string "$JUPITER_TV_CONFIG" dvb_root)"
+    TV_SCAN_INPUT="$(tv_json_string "$JUPITER_TV_CONFIG" scan_input_file)"
+    TV_CHANNELS_FILE="$(tv_json_string "$JUPITER_TV_CONFIG" channels_file)"
+    TV_CHANNELS_TSV="$(tv_json_string "$JUPITER_TV_CONFIG" channels_tsv)"
+    TV_CHANNELS_JSON="$(tv_json_string "$JUPITER_TV_CONFIG" channels_json)"
+    TV_STATE_FILE="$(tv_json_string "$JUPITER_TV_CONFIG" state_file)"
+    TV_RUN_DIR="$(tv_json_string "$JUPITER_TV_CONFIG" run_dir)"
+    TV_WEB_ROOT="$(tv_json_string "$JUPITER_TV_CONFIG" web_root)"
+    TV_SEGMENT_SECONDS="$(tv_json_number "$JUPITER_TV_CONFIG" segment_seconds)"
+    TV_PLAYLIST_SIZE="$(tv_json_number "$JUPITER_TV_CONFIG" playlist_size)"
+    TV_SAMPLE_SECONDS="$(tv_json_number "$JUPITER_TV_CONFIG" sample_seconds)"
+    TV_SAMPLE_WIDTH="$(tv_json_number "$JUPITER_TV_CONFIG" sample_width)"
+    TV_SAMPLE_HEIGHT="$(tv_json_number "$JUPITER_TV_CONFIG" sample_height)"
+    TV_SAMPLE_VIDEO_BITRATE="$(tv_json_string "$JUPITER_TV_CONFIG" sample_video_bitrate)"
+    TV_SAMPLE_AUDIO_BITRATE="$(tv_json_string "$JUPITER_TV_CONFIG" sample_audio_bitrate)"
+
+    [ -n "$TV_ENABLED" ] || TV_ENABLED="true"
+    [ -n "$TV_ADAPTER" ] || TV_ADAPTER=0
+    [ -n "$TV_FRONTEND" ] || TV_FRONTEND=0
+    [ -n "$TV_DVB_ROOT" ] || TV_DVB_ROOT=/dev/dvb
+    [ -n "$TV_SCAN_INPUT" ] || TV_SCAN_INPUT=/usr/share/dvbv5/isdb-t/br-Brazil
+    [ -n "$TV_CHANNELS_FILE" ] || TV_CHANNELS_FILE="$TV_DEFAULT_STATE_DIR/channels.conf"
+    [ -n "$TV_CHANNELS_TSV" ] || TV_CHANNELS_TSV="$TV_DEFAULT_STATE_DIR/channels.tsv"
+    [ -n "$TV_CHANNELS_JSON" ] || TV_CHANNELS_JSON="$TV_DEFAULT_STATE_DIR/channels.json"
+    [ -n "$TV_STATE_FILE" ] || TV_STATE_FILE="$TV_DEFAULT_STATE_DIR/state.json"
+    [ -n "$TV_RUN_DIR" ] || TV_RUN_DIR="$TV_DEFAULT_RUN_DIR"
+    [ -n "$TV_WEB_ROOT" ] || TV_WEB_ROOT="$TV_DEFAULT_WEB_ROOT"
+    [ -n "$TV_SEGMENT_SECONDS" ] || TV_SEGMENT_SECONDS=2
+    [ -n "$TV_PLAYLIST_SIZE" ] || TV_PLAYLIST_SIZE=6
+    [ -n "$TV_SAMPLE_SECONDS" ] || TV_SAMPLE_SECONDS=15
+    [ -n "$TV_SAMPLE_WIDTH" ] || TV_SAMPLE_WIDTH=640
+    [ -n "$TV_SAMPLE_HEIGHT" ] || TV_SAMPLE_HEIGHT=360
+    [ -n "$TV_SAMPLE_VIDEO_BITRATE" ] || TV_SAMPLE_VIDEO_BITRATE=450k
+    [ -n "$TV_SAMPLE_AUDIO_BITRATE" ] || TV_SAMPLE_AUDIO_BITRATE=64k
+
+    TV_CONTROLLER_PID="$TV_RUN_DIR/controller.pid"
+    TV_STREAM_PID="$TV_RUN_DIR/stream.pid"
+    TV_SCAN_PID="$TV_RUN_DIR/scan.pid"
+    TV_CONTROL_FIFO="$TV_RUN_DIR/control.fifo"
+    TV_CAPTURE_BIN="${JUPITER_TV_CAPTURE_BIN:-/usr/bin/jupiter-tv-capture}"
+    TV_LOG="$JUPITER_LOG_DIR/tv.log"
+}
+
+tv_ensure_dirs() {
+    tv_load_config
+    mkdir -p "$TV_RUN_DIR" "$(dirname "$TV_STATE_FILE")" "$(dirname "$TV_CHANNELS_FILE")" \
+        "$(dirname "$TV_CHANNELS_TSV")" "$(dirname "$TV_CHANNELS_JSON")" "$TV_WEB_ROOT"
+
+    if [ ! -r "$TV_STATE_FILE" ]; then
+        tv_write_state "idle" "idle" "" "" "" "" "" "" ""
+    fi
+}
+
+tv_json_escape() {
+    printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/	/ /g; s/\r//g; s/[[:cntrl:]]//g'
+}
+
+tv_state_string() {
+    local key file
+    key="$1"
+    file="${2:-$TV_STATE_FILE}"
+
+    [ -r "$file" ] || return 0
+
+    if command -v jq >/dev/null 2>&1; then
+        jq -r --arg key "$key" '.[$key] // empty' "$file" 2>/dev/null
+        return 0
+    fi
+
+    sed -n 's/.*"'"$key"'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$file" | head -n 1
+}
+
+tv_write_state() {
+    local scan_state stream_state channel_id channel_name manifest stream_pid error_message
+    local scan_started scan_finished temp_file
+    scan_state="$1"
+    stream_state="$2"
+    channel_id="$3"
+    channel_name="$4"
+    manifest="$5"
+    stream_pid="$6"
+    error_message="$7"
+    scan_started="$8"
+    scan_finished="$9"
+    temp_file="$TV_STATE_FILE.tmp.$$"
+
+    channel_id="$(tv_json_escape "$channel_id")"
+    channel_name="$(tv_json_escape "$channel_name")"
+    manifest="$(tv_json_escape "$manifest")"
+    error_message="$(tv_json_escape "$error_message")"
+    scan_started="$(tv_json_escape "$scan_started")"
+    scan_finished="$(tv_json_escape "$scan_finished")"
+
+    {
+        printf '{\n'
+        printf '  "schema_version": %s,\n' "$TV_SCHEMA_VERSION"
+        printf '  "updated_at": "%s",\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+        printf '  "scan_state": "%s",\n' "$(tv_json_escape "$scan_state")"
+        printf '  "scan_started_at": "%s",\n' "$scan_started"
+        printf '  "scan_finished_at": "%s",\n' "$scan_finished"
+        printf '  "stream_state": "%s",\n' "$(tv_json_escape "$stream_state")"
+        printf '  "channel_id": "%s",\n' "$channel_id"
+        printf '  "channel_name": "%s",\n' "$channel_name"
+        printf '  "manifest": "%s",\n' "$manifest"
+        printf '  "stream_pid": "%s",\n' "$(tv_json_escape "$stream_pid")"
+        printf '  "error": "%s"\n' "$error_message"
+        printf '}\n'
+    } > "$temp_file" && mv "$temp_file" "$TV_STATE_FILE"
+}
+
+tv_controller_running() {
+    local pid
+    [ -r "$TV_CONTROLLER_PID" ] || return 1
+    pid="$(cat "$TV_CONTROLLER_PID" 2>/dev/null)"
+    case "$pid" in
+        ''|*[!0-9]*) return 1 ;;
+    esac
+    kill -0 "$pid" 2>/dev/null
+}
+
+tv_process_running() {
+    local pid_file pid
+    pid_file="$1"
+    [ -r "$pid_file" ] || return 1
+    pid="$(cat "$pid_file" 2>/dev/null)"
+    case "$pid" in
+        ''|*[!0-9]*) return 1 ;;
+    esac
+    kill -0 "$pid" 2>/dev/null
+}
+
+tv_channel_count() {
+    [ -r "$TV_CHANNELS_TSV" ] || {
+        printf '0'
+        return 0
+    }
+    wc -l < "$TV_CHANNELS_TSV" | tr -d ' '
+}
+
+tv_send_command() {
+    local command
+    command="$1"
+    tv_controller_running || return 1
+    [ -p "$TV_CONTROL_FIFO" ] || return 1
+    printf '%s\n' "$command" > "$TV_CONTROL_FIFO"
+}

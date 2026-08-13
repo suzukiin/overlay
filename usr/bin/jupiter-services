@@ -8,6 +8,7 @@ VIN_MONITOR_PID="$JUPITER_RUN/vin-monitor.pid"
 MONITOR_PID="$JUPITER_RUN/monitor.pid"
 STATUS_LEDS_PID="$JUPITER_RUN/status-leds.pid"
 LTE_WATCHDOG_PID="$JUPITER_RUN/lte-watchdog.pid"
+TV_PID="$JUPITER_RUN/tv.pid"
 
 start_pid_service() {
     local name="$1"
@@ -47,6 +48,10 @@ start_scheduler() {
 
 start_web() {
     start_pid_service web "$WEB_PID" /usr/bin/jupiter-web
+}
+
+start_tv() {
+    start_pid_service tv "$TV_PID" /usr/bin/jupiter-tv
 }
 
 start_monitor() {
@@ -93,6 +98,10 @@ stop_web() {
     stop_pid_service web "$WEB_PID"
 }
 
+stop_tv() {
+    stop_pid_service tv "$TV_PID"
+}
+
 stop_vin_monitor() {
     stop_pid_service vin-monitor "$VIN_MONITOR_PID"
 }
@@ -121,6 +130,7 @@ start_services() {
     fi
 
     start_web
+    start_tv
     start_watchdog
     start_monitor
     start_scheduler
@@ -131,6 +141,7 @@ start_services() {
 stop_services() {
     stop_status_leds
     stop_vin_monitor
+    stop_tv
     stop_web
     stop_pid_service monitor "$MONITOR_PID"
     stop_watchdog

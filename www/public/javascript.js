@@ -2,7 +2,8 @@ document.addEventListener("DOMContentLoaded", function () {
     const POLL_INTERVALS = {
         quick: 120000,
         slow: 600000,
-        telemetry: 900000
+        telemetry: 900000,
+        tv: 2000
     };
 
     const pollers = [];
@@ -259,6 +260,364 @@ document.addEventListener("DOMContentLoaded", function () {
         } catch (error) {
             console.error("Erro ao buscar telemetria:", error);
         }
+    }
+
+    const tvPlayerState = {
+        hls: null,
+        manifest: "",
+        manifestWaitTimer: null,
+        attachGeneration: 0,
+        manifestAttached: false,
+        channels: [],
+        selectedChannel: ""
+    };
+
+    function tvElement(id) {
+        return document.getElementById(id);
+    }
+
+    function setTvError(message) {
+        const element = tvElement("tv-error");
+        if (!element) return;
+        element.textContent = message || "";
+        element.hidden = !message;
+    }
+
+    function setTvBadge(text, tone = "secondary") {
+        const element = tvElement("tv-status-badge");
+        if (!element) return;
+        element.textContent = text;
+        element.className = `badge bg-dark border border-${tone} text-${tone} font-mono`;
+    }
+
+    function formatTvFrequency(frequency) {
+        const value = Number(frequency);
+        if (!Number.isFinite(value) || value <= 0) return frequency || "--";
+        return `${(value / 1000000).toFixed(3)} MHz`;
+    }
+
+    function updateTvMetadata(channel) {
+        const container = tvElement("tv-channel-metadata");
+        if (!container) return;
+
+        const fields = {
+            "tv-meta-service-id": channel?.service_id || "--",
+            "tv-meta-frequency": formatTvFrequency(channel?.frequency),
+            "tv-meta-video-pid": channel?.video_pid || "--",
+            "tv-meta-audio-pid": channel?.audio_pid || "--"
+        };
+        Object.entries(fields).forEach(([id, value]) => {
+            const element = tvElement(id);
+            if (element) element.textContent = value;
+        });
+        container.hidden = !channel;
+    }
+
+    function destroyTvPlayer(clearSource = true) {
+        const video = tvElement("tv-video");
+        tvPlayerState.attachGeneration += 1;
+        if (tvPlayerState.manifestWaitTimer) {
+            clearTimeout(tvPlayerState.manifestWaitTimer);
+            tvPlayerState.manifestWaitTimer = null;
+        }
+        if (tvPlayerState.hls) {
+            tvPlayerState.hls.destroy();
+            tvPlayerState.hls = null;
+        }
+        if (video && clearSource) {
+            video.pause();
+            video.removeAttribute("src");
+            video.load();
+        }
+        tvPlayerState.manifest = "";
+        tvPlayerState.manifestAttached = false;
+        const placeholder = tvElement("tv-video-placeholder");
+        if (placeholder) placeholder.hidden = false;
+    }
+
+    function attachTvManifest(manifest, requireEndList = false) {
+        const video = tvElement("tv-video");
+        const placeholder = tvElement("tv-video-placeholder");
+        if (!video || !manifest || tvPlayerState.manifest === manifest) return;
+
+        destroyTvPlayer(false);
+        tvPlayerState.manifest = manifest;
+        tvPlayerState.manifestAttached = false;
+        const generation = tvPlayerState.attachGeneration;
+        const source = () => `${manifest}?v=${Date.now()}`;
+
+        const tryPlay = () => {
+            if (placeholder) placeholder.hidden = true;
+            video.play().catch(() => {
+                setTvError("Clique no player para iniciar o áudio/vídeo.");
+            });
+        };
+
+        const attachReadyManifest = () => {
+            if (generation !== tvPlayerState.attachGeneration ||
+                tvPlayerState.manifest !== manifest) return;
+
+            tvPlayerState.manifestWaitTimer = null;
+            tvPlayerState.manifestAttached = true;
+            video.muted = false;
+            video.addEventListener("canplay", tryPlay, { once: true });
+
+            if (window.Hls && window.Hls.isSupported()) {
+                const hls = new window.Hls({
+                    enableWorker: true,
+                    liveSyncDurationCount: 3
+                });
+                tvPlayerState.hls = hls;
+                hls.on(window.Hls.Events.ERROR, (_event, data) => {
+                    if (!data || !data.fatal ||
+                        generation !== tvPlayerState.attachGeneration) return;
+
+                    destroyTvPlayer(false);
+                    setTvError("Aguardando dados válidos da transmissão...");
+                    tvPlayerState.manifest = "";
+                    tvPlayerState.manifestWaitTimer = setTimeout(() => {
+                        attachTvManifest(manifest, requireEndList);
+                    }, 1500);
+                });
+                hls.loadSource(source());
+                hls.attachMedia(video);
+                return;
+            }
+
+            if (video.canPlayType("application/vnd.apple.mpegurl")) {
+                video.src = source();
+                return;
+            }
+
+            setTvError("Este navegador não possui suporte a HLS.");
+        };
+
+        const waitForPlaylist = async (attempt = 0) => {
+            if (generation !== tvPlayerState.attachGeneration ||
+                tvPlayerState.manifest !== manifest) return;
+
+            try {
+                const response = await fetch(source(), { cache: "no-store" });
+                const playlist = await response.text();
+                const ready = response.ok && playlist.includes("#EXTM3U") &&
+                    playlist.includes("#EXTINF") &&
+                    (!requireEndList || playlist.includes("#EXT-X-ENDLIST"));
+                if (ready) {
+                    attachReadyManifest();
+                    return;
+                }
+            } catch (_error) {
+                // The capture may still be creating the first playlist.
+            }
+
+            if (attempt >= 20) {
+                setTvError("A transmissão não gerou uma playlist HLS válida.");
+                return;
+            }
+
+            tvPlayerState.manifestWaitTimer = setTimeout(() => {
+                waitForPlaylist(attempt + 1);
+            }, 1000);
+        };
+
+        setTvError("Aguardando o início da transmissão...");
+        waitForPlaylist();
+    }
+
+    function updateTvChannelSelect(channels, selectedChannel) {
+        const select = tvElement("tv-channel-select");
+        if (!select) return;
+
+        const previous = selectedChannel || select.value;
+        select.innerHTML = "";
+        if (!channels.length) {
+            select.disabled = true;
+            select.appendChild(new Option("Nenhum canal carregado", ""));
+            return;
+        }
+
+        select.disabled = false;
+        channels.forEach(channel => {
+            const label = channel.frequency
+                ? `${channel.name} · ${formatTvFrequency(channel.frequency)}`
+                : channel.name;
+            select.appendChild(new Option(label, channel.id));
+        });
+
+        if (channels.some(channel => channel.id === previous)) {
+            select.value = previous;
+        } else {
+            select.selectedIndex = 0;
+        }
+        tvPlayerState.selectedChannel = select.value;
+        updateTvMetadata(channels.find(channel => channel.id === select.value));
+    }
+
+    async function fetchTvChannels() {
+        try {
+            const response = await fetch("/cgi-bin/tv-channels", { cache: "no-cache" });
+            const result = await response.json();
+            if (result.status !== "Success") throw new Error(result.msg || "Falha ao carregar canais");
+            tvPlayerState.channels = Array.isArray(result.data?.channels) ? result.data.channels : [];
+            updateTvChannelSelect(tvPlayerState.channels, tvPlayerState.selectedChannel);
+            const count = tvElement("tv-channel-count");
+            if (count) count.textContent = tvPlayerState.channels.length;
+        } catch (error) {
+            console.error("Erro ao buscar canais de TV:", error);
+            setTvError("Não foi possível carregar a lista de canais.");
+        }
+    }
+
+    function updateTvControls(data) {
+        const scanRunning = data.scan_state === "running";
+        const streamRunning = data.stream_state === "running";
+        const sampleCapturing = data.stream_state === "capturing";
+        const sampleReady = data.stream_state === "ready";
+        const streamPresent = streamRunning || sampleCapturing || sampleReady;
+        const scanButton = tvElement("tv-scan-btn");
+        const startButton = tvElement("tv-start-btn");
+        const stopButton = tvElement("tv-stop-btn");
+        const select = tvElement("tv-channel-select");
+        const scanState = tvElement("tv-scan-state");
+        const streamState = tvElement("tv-stream-state");
+        const statusText = tvElement("tv-status-text");
+        const tuner = tvElement("tv-tuner-indicator");
+
+        if (scanButton) scanButton.disabled = scanRunning;
+        if (startButton) startButton.disabled = scanRunning || sampleCapturing || !select || !select.value;
+        if (stopButton) stopButton.disabled = !streamPresent && data.stream_state !== "error";
+        if (select) select.disabled = scanRunning || sampleCapturing || tvPlayerState.channels.length === 0;
+        if (scanState) scanState.textContent = data.scan_state || "--";
+        if (streamState) streamState.textContent = data.stream_state || "--";
+        if (statusText) {
+            statusText.textContent = data.error || (sampleCapturing
+                ? `Gerando amostra ${data.sample_width || 640}x${data.sample_height || 360} (${data.sample_seconds || 15}s)`
+                : sampleReady ? `Amostra pronta: ${data.channel_name || "canal selecionado"}`
+                : streamRunning
+                ? `Transmitindo ${data.channel_name || "canal selecionado"}`
+                : scanRunning ? "Varredura em andamento" : "Pronto para iniciar");
+        }
+        if (tuner) {
+            tuner.textContent = data.tuner_present ? "TUNER OK" : "TUNER AUSENTE";
+            tuner.classList.toggle("is-ready", Boolean(data.tuner_present));
+        }
+
+        if (data.enabled === false) {
+            if (scanButton) scanButton.disabled = true;
+            if (startButton) startButton.disabled = true;
+            if (stopButton) stopButton.disabled = true;
+            if (select) select.disabled = true;
+            if (statusText) statusText.textContent = "TV digital desativada na configuração";
+            setTvBadge("DESATIVADA", "secondary");
+            destroyTvPlayer();
+            return;
+        }
+
+        if (data.stream_state === "capturing" && data.manifest) {
+            if (tvPlayerState.hls || tvPlayerState.manifest || tvPlayerState.manifestWaitTimer) {
+                destroyTvPlayer();
+            }
+            setTvBadge("GERANDO AMOSTRA", "warning");
+            setTvError(`Capturando ${data.sample_seconds || 15} segundos de vídeo...`);
+        } else if (data.stream_state === "ready" && data.manifest) {
+            attachTvManifest(data.manifest, true);
+            setTvBadge("AMOSTRA PRONTA", "success");
+            if (tvPlayerState.manifestAttached) setTvError("");
+        } else if (data.stream_state === "running" && data.manifest) {
+            attachTvManifest(data.manifest);
+            setTvBadge("TRANSMITINDO", "success");
+            setTvError("");
+        } else if (data.scan_state === "running") {
+            setTvBadge("VARREDURA", "warning");
+        } else if (data.error) {
+            setTvBadge("ERRO", "danger");
+            setTvError(data.error);
+            destroyTvPlayer();
+        } else if (!data.tuner_present) {
+            setTvBadge("TUNER AUSENTE", "danger");
+            destroyTvPlayer();
+        } else {
+            setTvBadge("PRONTA", "secondary");
+            if (!streamPresent) destroyTvPlayer();
+        }
+    }
+
+    async function fetchTvStatus() {
+        try {
+            const response = await fetch("/cgi-bin/tv-status", { cache: "no-cache" });
+            const result = await response.json();
+            if (result.status !== "Success") throw new Error(result.msg || "Falha no status da TV");
+            updateTvControls(result.data || {});
+            if (Number(result.data?.channel_count) !== tvPlayerState.channels.length) {
+                await fetchTvChannels();
+            }
+            const selected = result.data?.channel_id;
+            if (selected && tvPlayerState.channels.length) {
+                updateTvChannelSelect(tvPlayerState.channels, selected);
+            }
+        } catch (error) {
+            console.error("Erro ao buscar status da TV:", error);
+            setTvBadge("SEM RESPOSTA", "danger");
+            const statusText = tvElement("tv-status-text");
+            if (statusText) statusText.textContent = "Controlador indisponível";
+        }
+    }
+
+    async function tvPost(url) {
+        const response = await fetch(url, { method: "POST" });
+        const result = await response.json();
+        if (result.status !== "Success") throw new Error(result.msg || "Operação de TV falhou");
+        return result;
+    }
+
+    async function requestTvScan() {
+        try {
+            setTvError("");
+            await tvPost("/cgi-bin/tv-scan");
+            await fetchTvStatus();
+        } catch (error) {
+            setTvError(error.message);
+        }
+    }
+
+    async function requestTvStart() {
+        const select = tvElement("tv-channel-select");
+        if (!select || !select.value) return;
+        try {
+            setTvError("");
+            tvPlayerState.selectedChannel = select.value;
+            await tvPost(`/cgi-bin/tv-select?channel_id=${encodeURIComponent(select.value)}`);
+            await fetchTvStatus();
+        } catch (error) {
+            setTvError(error.message);
+        }
+    }
+
+    async function requestTvStop() {
+        try {
+            await tvPost("/cgi-bin/tv-stop");
+            destroyTvPlayer();
+            await fetchTvStatus();
+        } catch (error) {
+            setTvError(error.message);
+        }
+    }
+
+    function initializeTvControls() {
+        const scanButton = tvElement("tv-scan-btn");
+        const startButton = tvElement("tv-start-btn");
+        const stopButton = tvElement("tv-stop-btn");
+        const select = tvElement("tv-channel-select");
+        if (scanButton) scanButton.addEventListener("click", requestTvScan);
+        if (startButton) startButton.addEventListener("click", requestTvStart);
+        if (stopButton) stopButton.addEventListener("click", requestTvStop);
+        if (select) {
+            select.addEventListener("change", () => {
+                tvPlayerState.selectedChannel = select.value;
+                updateTvMetadata(tvPlayerState.channels.find(channel => channel.id === select.value));
+            });
+        }
+        fetchTvChannels();
     }
 
     const batteryPowerState = {
@@ -1091,6 +1450,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     renderScheduleRules();
 
+    initializeTvControls();
     startPoller(fetchNavbarInfo, POLL_INTERVALS.slow);
     startPoller(fetchUptime, POLL_INTERVALS.slow);
     startPoller(fetchTraffic, POLL_INTERVALS.slow);
@@ -1101,6 +1461,7 @@ document.addEventListener("DOMContentLoaded", function () {
     startPoller(fetchVinStatus, POLL_INTERVALS.quick);
     startPoller(fetchRelays, POLL_INTERVALS.quick);
     startPoller(fetchStatusVpn, POLL_INTERVALS.slow);
+    startPoller(fetchTvStatus, POLL_INTERVALS.tv);
 
     document.addEventListener("visibilitychange", () => {
         if (document.hidden) return;

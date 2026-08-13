@@ -1,0 +1,113 @@
+#!/bin/sh
+
+set -u
+
+channel_name="${1:-}"
+channels_file="${2:-}"
+adapter="${3:-0}"
+frontend="${4:-0}"
+output_dir="${5:-}"
+input_fifo="${6:-}"
+segment_seconds="${7:-2}"
+playlist_size="${8:-6}"
+sample_seconds="${9:-15}"
+sample_width="${10:-640}"
+sample_height="${11:-360}"
+sample_video_bitrate="${12:-450k}"
+sample_audio_bitrate="${13:-64k}"
+
+if [ -z "$channel_name" ] || [ -z "$channels_file" ] || [ -z "$output_dir" ] || [ -z "$input_fifo" ]; then
+    exit 64
+fi
+
+case "$sample_seconds:$sample_width:$sample_height" in
+    *[!0-9:]*|:*|*:*:|*::*) exit 64 ;;
+esac
+
+if ! ffmpeg -hide_banner -encoders 2>/dev/null | grep -q 'libx264'; then
+    echo "required FFmpeg encoder libx264 is not available" >&2
+    exit 69
+fi
+
+mkdir -p "$output_dir" || exit 1
+rm -f "$input_fifo"
+mkfifo "$input_fifo" || exit 1
+
+ffmpeg_pid=""
+zap_pid=""
+
+cleanup() {
+    [ -n "$zap_pid" ] && kill "$zap_pid" 2>/dev/null || true
+    [ -n "$ffmpeg_pid" ] && kill "$ffmpeg_pid" 2>/dev/null || true
+    [ -n "$zap_pid" ] && wait "$zap_pid" 2>/dev/null || true
+    [ -n "$ffmpeg_pid" ] && wait "$ffmpeg_pid" 2>/dev/null || true
+    rm -f "$input_fifo"
+}
+
+trap cleanup INT TERM EXIT
+
+pid_active() {
+    pid="$1"
+    kill -0 "$pid" 2>/dev/null || return 1
+
+    if [ -r "/proc/$pid/stat" ]; then
+        state="$(sed 's/^[^)]*) //' "/proc/$pid/stat" | cut -d' ' -f1)"
+        [ "$state" != "Z" ] || return 1
+    fi
+}
+
+ffmpeg -nostdin -hide_banner -loglevel warning \
+    -analyzeduration 10M \
+    -probesize 10M \
+    -i "$input_fifo" \
+    -map 0:v:0 \
+    -map 0:a:0? \
+    -vf "scale=${sample_width}:${sample_height}" \
+    -c:v libx264 \
+    -preset ultrafast \
+    -tune zerolatency \
+    -b:v "$sample_video_bitrate" \
+    -maxrate "$sample_video_bitrate" \
+    -bufsize "$sample_video_bitrate" \
+    -pix_fmt yuv420p \
+    -g 50 \
+    -keyint_min 50 \
+    -sc_threshold 0 \
+    -c:a aac \
+    -b:a "$sample_audio_bitrate" \
+    -ar 48000 \
+    -ac 2 \
+    -t "$sample_seconds" \
+    -f hls \
+    -hls_time "$segment_seconds" \
+    -hls_list_size 0 \
+    -hls_playlist_type vod \
+    -hls_flags independent_segments \
+    -hls_segment_filename "$output_dir/segment_%05d.ts" \
+    "$output_dir/index.m3u8" &
+ffmpeg_pid="$!"
+
+dvbv5-zap -a "$adapter" -f "$frontend" -c "$channels_file" -p -o "$input_fifo" "$channel_name" &
+zap_pid="$!"
+
+while pid_active "$ffmpeg_pid" && pid_active "$zap_pid"; do
+    sleep 1
+done
+
+ffmpeg_status=1
+if ! pid_active "$ffmpeg_pid"; then
+    wait "$ffmpeg_pid" 2>/dev/null
+    ffmpeg_status="$?"
+fi
+
+if [ "$ffmpeg_status" -eq 0 ] && [ -s "$output_dir/index.m3u8" ] && \
+    grep -q '#EXT-X-ENDLIST' "$output_dir/index.m3u8"; then
+    : > "$output_dir/.complete"
+else
+    ffmpeg_status=1
+fi
+
+cleanup
+trap - INT TERM EXIT
+
+exit "$ffmpeg_status"

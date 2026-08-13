@@ -1,0 +1,74 @@
+#!/bin/sh
+
+COMMON="${JUPITER_TV_COMMON:-/usr/bin/jupiter-tv-common}"
+if [ ! -f "$COMMON" ]; then
+    COMMON="$(dirname "$0")/../../usr/bin/jupiter-tv-common"
+fi
+. "$COMMON"
+
+printf 'Content-Type: application/json\r\n\r\n'
+
+tv_ensure_dirs
+
+scan_state="$(tv_state_string scan_state)"
+stream_state="$(tv_state_string stream_state)"
+channel_id="$(tv_state_string channel_id)"
+channel_name="$(tv_state_string channel_name)"
+manifest="$(tv_state_string manifest)"
+stream_pid="$(tv_state_string stream_pid)"
+error_message="$(tv_state_string error)"
+
+session_dir=""
+case "$manifest" in
+    /public/tv/*/index.m3u8)
+        session_dir="$TV_WEB_ROOT/${manifest#/public/tv/}"
+        session_dir="${session_dir%/index.m3u8}"
+        ;;
+esac
+
+if [ "$stream_state" = "capturing" ] && [ -f "$session_dir/.complete" ]; then
+    tv_write_state "$(tv_state_string scan_state)" "ready" "$channel_id" "$channel_name" \
+        "$manifest" "" "" "$(tv_state_string scan_started_at)" \
+        "$(tv_state_string scan_finished_at)"
+    stream_state="ready"
+    stream_pid=""
+elif [ "$stream_state" = "capturing" ] && ! tv_process_running "$TV_STREAM_PID"; then
+    stream_state="error"
+    error_message="sample process exited"
+    manifest=""
+elif [ "$stream_state" = "running" ] && ! tv_process_running "$TV_STREAM_PID"; then
+    stream_state="error"
+    error_message="stream process exited"
+    manifest=""
+fi
+
+if [ "$scan_state" = "running" ] && ! tv_process_running "$TV_SCAN_PID"; then
+    scan_state="error"
+    error_message="scan process exited"
+fi
+
+tuner=false
+if [ -e "$TV_DVB_ROOT/adapter${TV_ADAPTER}/frontend${TV_FRONTEND}" ] && \
+    [ -e "$TV_DVB_ROOT/adapter${TV_ADAPTER}/dvr0" ]; then
+    tuner=true
+fi
+
+controller=false
+tv_controller_running && controller=true
+
+printf '{"status":"Success","data":{'
+printf '"enabled":%s,' "$TV_ENABLED"
+printf '"controller_present":%s,' "$controller"
+printf '"tuner_present":%s,' "$tuner"
+printf '"adapter":%s,"frontend":%s,' "$TV_ADAPTER" "$TV_FRONTEND"
+printf '"scan_state":"%s",' "$(tv_json_escape "$scan_state")"
+printf '"stream_state":"%s",' "$(tv_json_escape "$stream_state")"
+printf '"sample_seconds":%s,"sample_width":%s,"sample_height":%s,' \
+    "$TV_SAMPLE_SECONDS" "$TV_SAMPLE_WIDTH" "$TV_SAMPLE_HEIGHT"
+printf '"channel_id":"%s",' "$(tv_json_escape "$channel_id")"
+printf '"channel_name":"%s",' "$(tv_json_escape "$channel_name")"
+printf '"manifest":"%s",' "$(tv_json_escape "$manifest")"
+printf '"stream_pid":"%s",' "$(tv_json_escape "$stream_pid")"
+printf '"channel_count":%s,' "$(tv_channel_count 2>/dev/null || echo 0)"
+printf '"error":"%s"' "$(tv_json_escape "$error_message")"
+printf '}}\n'
