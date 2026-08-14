@@ -269,7 +269,9 @@ document.addEventListener("DOMContentLoaded", function () {
         attachGeneration: 0,
         manifestAttached: false,
         channels: [],
-        selectedChannel: ""
+        selectedChannel: "",
+        regions: [],
+        selectedRegion: ""
     };
 
     function tvElement(id) {
@@ -296,6 +298,12 @@ document.addEventListener("DOMContentLoaded", function () {
         return `${(value / 1000000).toFixed(3)} MHz`;
     }
 
+    function formatTvBandwidth(bandwidth) {
+        const value = Number(bandwidth);
+        if (!Number.isFinite(value) || value <= 0) return bandwidth || "--";
+        return `${(value / 1000000).toFixed(3)} MHz`;
+    }
+
     function updateTvMetadata(channel) {
         const container = tvElement("tv-channel-metadata");
         if (!container) return;
@@ -304,7 +312,16 @@ document.addEventListener("DOMContentLoaded", function () {
             "tv-meta-service-id": channel?.service_id || "--",
             "tv-meta-frequency": formatTvFrequency(channel?.frequency),
             "tv-meta-video-pid": channel?.video_pid || "--",
-            "tv-meta-audio-pid": channel?.audio_pid || "--"
+            "tv-meta-audio-pid": channel?.audio_pid || "--",
+            "tv-meta-video-codec": channel?.video_codec || "H.264",
+            "tv-meta-audio-codec": channel?.audio_codec || "AAC",
+            "tv-meta-modulation": channel?.modulation || "--",
+            "tv-meta-bandwidth": formatTvBandwidth(channel?.bandwidth_hz),
+            "tv-meta-guard-mode": [channel?.guard_interval, channel?.transmission_mode]
+                .filter(Boolean).join(" / ") || "--",
+            "tv-meta-code-rate": [channel?.code_rate_hp, channel?.code_rate_lp]
+                .filter(Boolean).join(" / ") || "--",
+            "tv-meta-inversion": channel?.inversion || "--"
         };
         Object.entries(fields).forEach(([id, value]) => {
             const element = tvElement(id);
@@ -453,6 +470,49 @@ document.addEventListener("DOMContentLoaded", function () {
         updateTvMetadata(channels.find(channel => channel.id === select.value));
     }
 
+    function updateTvRegionSelect(regions, selectedRegion) {
+        const select = tvElement("tv-region-select");
+        if (!select) return;
+
+        const previous = selectedRegion || select.value;
+        select.innerHTML = "";
+        if (!regions.length) {
+            select.disabled = true;
+            select.appendChild(new Option("Nenhuma tabela regional encontrada", ""));
+            return;
+        }
+
+        select.disabled = false;
+        regions.forEach(region => {
+            select.appendChild(new Option(region.label, region.id));
+        });
+        if (regions.some(region => region.id === previous)) {
+            select.value = previous;
+        } else {
+            select.selectedIndex = 0;
+        }
+        tvPlayerState.selectedRegion = select.value;
+    }
+
+    async function fetchTvRegions() {
+        try {
+            const response = await fetch("/cgi-bin/tv-regions", { cache: "no-cache" });
+            const result = await response.json();
+            if (result.status !== "Success") throw new Error(result.msg || "Falha ao carregar regiões");
+            tvPlayerState.regions = Array.isArray(result.data?.regions) ? result.data.regions : [];
+            tvPlayerState.selectedRegion = result.data?.selected_region_id || tvPlayerState.selectedRegion;
+            updateTvRegionSelect(tvPlayerState.regions, tvPlayerState.selectedRegion);
+        } catch (error) {
+            console.error("Erro ao buscar tabelas regionais de TV:", error);
+            const select = tvElement("tv-region-select");
+            if (select) {
+                select.disabled = true;
+                select.innerHTML = "";
+                select.appendChild(new Option("Falha ao carregar tabelas", ""));
+            }
+        }
+    }
+
     async function fetchTvChannels() {
         try {
             const response = await fetch("/cgi-bin/tv-channels", { cache: "no-cache" });
@@ -477,16 +537,20 @@ document.addEventListener("DOMContentLoaded", function () {
         const scanButton = tvElement("tv-scan-btn");
         const startButton = tvElement("tv-start-btn");
         const stopButton = tvElement("tv-stop-btn");
+        const regionSelect = tvElement("tv-region-select");
         const select = tvElement("tv-channel-select");
+        const regionState = tvElement("tv-region-state");
         const scanState = tvElement("tv-scan-state");
         const streamState = tvElement("tv-stream-state");
         const statusText = tvElement("tv-status-text");
         const tuner = tvElement("tv-tuner-indicator");
 
-        if (scanButton) scanButton.disabled = scanRunning;
+        if (scanButton) scanButton.disabled = scanRunning || !regionSelect || !regionSelect.value;
         if (startButton) startButton.disabled = scanRunning || sampleCapturing || !select || !select.value;
         if (stopButton) stopButton.disabled = !streamPresent && data.stream_state !== "error";
+        if (regionSelect) regionSelect.disabled = scanRunning || tvPlayerState.regions.length === 0;
         if (select) select.disabled = scanRunning || sampleCapturing || tvPlayerState.channels.length === 0;
+        if (regionState) regionState.textContent = data.region_name || data.region_id || "--";
         if (scanState) scanState.textContent = data.scan_state || "--";
         if (streamState) streamState.textContent = data.stream_state || "--";
         if (statusText) {
@@ -495,7 +559,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 : sampleReady ? `Amostra pronta: ${data.channel_name || "canal selecionado"}`
                 : streamRunning
                 ? `Transmitindo ${data.channel_name || "canal selecionado"}`
-                : scanRunning ? "Varredura em andamento" : "Pronto para iniciar");
+                : scanRunning ? `Varredura em andamento${data.region_name ? ` · ${data.region_name}` : ""}` : "Pronto para iniciar");
         }
         if (tuner) {
             tuner.textContent = data.tuner_present ? "TUNER OK" : "TUNER AUSENTE";
@@ -506,6 +570,7 @@ document.addEventListener("DOMContentLoaded", function () {
             if (scanButton) scanButton.disabled = true;
             if (startButton) startButton.disabled = true;
             if (stopButton) stopButton.disabled = true;
+            if (regionSelect) regionSelect.disabled = true;
             if (select) select.disabled = true;
             if (statusText) statusText.textContent = "TV digital desativada na configuração";
             setTvBadge("DESATIVADA", "secondary");
@@ -555,6 +620,9 @@ document.addEventListener("DOMContentLoaded", function () {
             if (selected && tvPlayerState.channels.length) {
                 updateTvChannelSelect(tvPlayerState.channels, selected);
             }
+            if (result.data?.region_id && tvPlayerState.regions.length) {
+                updateTvRegionSelect(tvPlayerState.regions, result.data.region_id);
+            }
         } catch (error) {
             console.error("Erro ao buscar status da TV:", error);
             setTvBadge("SEM RESPOSTA", "danger");
@@ -571,9 +639,15 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     async function requestTvScan() {
+        const regionSelect = tvElement("tv-region-select");
+        if (!regionSelect || !regionSelect.value) {
+            setTvError("Nenhuma tabela regional disponível para a varredura.");
+            return;
+        }
         try {
             setTvError("");
-            await tvPost("/cgi-bin/tv-scan");
+            tvPlayerState.selectedRegion = regionSelect.value;
+            await tvPost(`/cgi-bin/tv-scan?region_id=${encodeURIComponent(regionSelect.value)}`);
             await fetchTvStatus();
         } catch (error) {
             setTvError(error.message);
@@ -607,16 +681,23 @@ document.addEventListener("DOMContentLoaded", function () {
         const scanButton = tvElement("tv-scan-btn");
         const startButton = tvElement("tv-start-btn");
         const stopButton = tvElement("tv-stop-btn");
+        const regionSelect = tvElement("tv-region-select");
         const select = tvElement("tv-channel-select");
         if (scanButton) scanButton.addEventListener("click", requestTvScan);
         if (startButton) startButton.addEventListener("click", requestTvStart);
         if (stopButton) stopButton.addEventListener("click", requestTvStop);
+        if (regionSelect) {
+            regionSelect.addEventListener("change", () => {
+                tvPlayerState.selectedRegion = regionSelect.value;
+            });
+        }
         if (select) {
             select.addEventListener("change", () => {
                 tvPlayerState.selectedChannel = select.value;
                 updateTvMetadata(tvPlayerState.channels.find(channel => channel.id === select.value));
             });
         }
+        fetchTvRegions();
         fetchTvChannels();
     }
 

@@ -17,15 +17,23 @@ fi
 
 action=""
 channel_id=""
+region_id=""
 for item in $(printf '%s' "${QUERY_STRING:-}" | tr '&' ' '); do
     case "$item" in
         action=*) action="${item#action=}" ;;
         channel_id=*) channel_id="${item#channel_id=}" ;;
+        region_id=*) region_id="${item#region_id=}" ;;
     esac
 done
 
 case "$action" in
     scan|stop)
+        if [ "$action" = "scan" ] && [ -n "$region_id" ]; then
+            tv_region_path "$region_id" >/dev/null 2>&1 || {
+                printf '{"status":"Error","msg":"Invalid region_id"}\n'
+                exit 0
+            }
+        fi
         ;;
     select)
         case "$channel_id" in
@@ -57,7 +65,11 @@ case "$action" in
             printf '{"status":"Error","msg":"Scan already in progress"}\n'
             exit 0
         fi
-        tv_send_command scan || {
+        if [ -n "$region_id" ]; then
+            tv_send_command "scan $region_id"
+        else
+            tv_send_command scan
+        fi || {
             printf '{"status":"Error","msg":"Could not start scan"}\n'
             exit 0
         }

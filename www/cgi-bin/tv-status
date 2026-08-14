@@ -17,6 +17,9 @@ channel_name="$(tv_state_string channel_name)"
 manifest="$(tv_state_string manifest)"
 stream_pid="$(tv_state_string stream_pid)"
 error_message="$(tv_state_string error)"
+region_id="$(tv_region_id_from_path "$TV_SCAN_INPUT")"
+region_name=""
+[ -z "$region_id" ] || region_name="$(tv_region_label "$region_id")"
 
 session_dir=""
 case "$manifest" in
@@ -61,6 +64,8 @@ printf '"enabled":%s,' "$TV_ENABLED"
 printf '"controller_present":%s,' "$controller"
 printf '"tuner_present":%s,' "$tuner"
 printf '"adapter":%s,"frontend":%s,' "$TV_ADAPTER" "$TV_FRONTEND"
+printf '"region_id":"%s","region_name":"%s",' \
+    "$(tv_json_escape "$region_id")" "$(tv_json_escape "$region_name")"
 printf '"scan_state":"%s",' "$(tv_json_escape "$scan_state")"
 printf '"stream_state":"%s",' "$(tv_json_escape "$stream_state")"
 printf '"sample_seconds":%s,"sample_width":%s,"sample_height":%s,' \

@@ -49,7 +49,9 @@ parse_scan_channels() {
     }
     function emit() {
         if (name != "" && video != "" && video != "0") {
-            printf "%s\t%s\t%s\t%s\t%s\n", name, service, frequency, video, audio
+            printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", \
+                name, service, frequency, video, audio, modulation, bandwidth, guard, \
+                transmission, code_hp, code_lp, inversion
         }
     }
         /^\[/ {
@@ -61,12 +63,26 @@ parse_scan_channels() {
         frequency = ""
         video = ""
         audio = ""
+        modulation = ""
+        bandwidth = ""
+        guard = ""
+        transmission = ""
+        code_hp = ""
+        code_lp = ""
+        inversion = ""
         next
     }
     /^[[:space:]]*SERVICE_ID[[:space:]]*=/ { service = field_value($0); next }
     /^[[:space:]]*FREQUENCY[[:space:]]*=/ { frequency = field_value($0); next }
     /^[[:space:]]*VIDEO_PID[[:space:]]*=/ { video = field_value($0); next }
     /^[[:space:]]*AUDIO_PID[[:space:]]*=/ { audio = field_value($0); next }
+    /^[[:space:]]*MODULATION[[:space:]]*=/ { modulation = field_value($0); next }
+    /^[[:space:]]*BANDWIDTH_HZ[[:space:]]*=/ { bandwidth = field_value($0); next }
+    /^[[:space:]]*GUARD_INTERVAL[[:space:]]*=/ { guard = field_value($0); next }
+    /^[[:space:]]*TRANSMISSION_MODE[[:space:]]*=/ { transmission = field_value($0); next }
+    /^[[:space:]]*CODE_RATE_HP[[:space:]]*=/ { code_hp = field_value($0); next }
+    /^[[:space:]]*CODE_RATE_LP[[:space:]]*=/ { code_lp = field_value($0); next }
+    /^[[:space:]]*INVERSION[[:space:]]*=/ { inversion = field_value($0); next }
     END { emit() }
     ' "$input_file" > "$output_tsv"
 
@@ -82,7 +98,7 @@ make_channels_json() {
 
     {
         printf '{"schema_version":1,"channels":['
-        while IFS="	" read -r name service frequency video audio; do
+        while IFS="	" read -r name service frequency video audio modulation bandwidth guard transmission code_hp code_lp inversion; do
             [ -n "$name" ] || continue
             index=$((index + 1))
             if [ "$first" = true ]; then
@@ -90,9 +106,13 @@ make_channels_json() {
             else
                 printf ','
             fi
-            printf '{"id":"ch-%03d","name":"%s","service_id":"%s","frequency":"%s","video_pid":"%s","audio_pid":"%s"}' \
+            printf '{"id":"ch-%03d","name":"%s","service_id":"%s","frequency":"%s","video_pid":"%s","audio_pid":"%s","video_codec":"H.264","audio_codec":"AAC","modulation":"%s","bandwidth_hz":"%s","guard_interval":"%s","transmission_mode":"%s","code_rate_hp":"%s","code_rate_lp":"%s","inversion":"%s"}' \
                 "$index" "$(tv_json_escape "$name")" "$(tv_json_escape "$service")" \
-                "$(tv_json_escape "$frequency")" "$(tv_json_escape "$video")" "$(tv_json_escape "$audio")"
+                "$(tv_json_escape "$frequency")" "$(tv_json_escape "$video")" "$(tv_json_escape "$audio")" \
+                "$(tv_json_escape "$modulation")" "$(tv_json_escape "$bandwidth")" \
+                "$(tv_json_escape "$guard")" "$(tv_json_escape "$transmission")" \
+                "$(tv_json_escape "$code_hp")" "$(tv_json_escape "$code_lp")" \
+                "$(tv_json_escape "$inversion")"
         done < "$source_tsv"
         printf ']}\n'
     } > "$temp_json" && mv "$temp_json" "$output_json"
@@ -154,7 +174,7 @@ start_stream() {
         return 1
     }
 
-    IFS="	" read -r channel_name service frequency video audio <<EOF
+    IFS="	" read -r channel_name service frequency video audio modulation bandwidth guard transmission code_hp code_lp inversion <<EOF
 $channel_line
 EOF
     [ -n "$channel_name" ] || return 1
@@ -227,7 +247,23 @@ run_scan() {
 }
 
 start_scan() {
+    region_id="${1:-}"
     tv_process_running "$TV_SCAN_PID" && return 0
+
+    if [ -n "$region_id" ]; then
+        TV_SCAN_INPUT="$(tv_region_path "$region_id")" || {
+            jupiter_log tv "scan ignored; invalid region=$region_id"
+            return 1
+        }
+        temp_region_file="$TV_REGION_STATE_FILE.tmp.$$"
+        if ! printf '%s\n' "$TV_SCAN_INPUT" > "$temp_region_file" || \
+            ! mv "$temp_region_file" "$TV_REGION_STATE_FILE"; then
+            rm -f "$temp_region_file"
+            jupiter_log tv "scan ignored; could not persist region=$region_id"
+            return 1
+        fi
+    fi
+
     stop_stream
     echo "starting" > "$TV_SCAN_PID.state"
     run_scan &
@@ -244,7 +280,7 @@ handle_command() {
             if tv_process_running "$TV_SCAN_PID"; then
                 jupiter_log tv "scan ignored; already running"
             else
-                start_scan
+                start_scan "$argument"
             fi
             ;;
         select)

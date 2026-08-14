@@ -44,27 +44,45 @@ cat /var/lib/jupiter/tv/channels.json
 tail -f /var/log/jupiter/tv.log
 ```
 
-Na primeira utilização, clique em `Atualizar canais`. A varredura usa o arquivo
-de frequências definido em `/etc/jupiter/tv.json` e preserva o último resultado
-válido. Depois selecione um serviço e clique em `Iniciar visualização`.
+Na primeira utilização, escolha a região da varredura e clique em `Atualizar
+canais`. A lista é montada a partir dos arquivos `br-*` instalados em
+`/usr/share/dvb/isdb-t` (ou no diretório definido por `scan_table_dir`). Por
+exemplo, ao viajar para São Paulo, selecione uma tabela `br-sp-*` disponível e
+faça uma nova varredura. O resultado anterior é preservado até que a nova
+varredura termine com sucesso. Depois selecione um serviço e clique em
+`Iniciar visualização`.
 
 A amostra é publicada localmente como HLS VOD em
 `/public/tv/<sessao>/index.m3u8`. Somente uma sessão é mantida por vez, e os
 segmentos antigos são removidos automaticamente. Não há gravação permanente do
 transporte MPEG-TS.
 
-Ao escolher um canal, a interface também mostra o `service_id`, a frequência e
-os PIDs de vídeo e áudio encontrados na varredura. Durante a captura, a página
-exibe `GERANDO AMOSTRA`; a reprodução começa somente quando a playlist VOD é
-finalizada.
+Ao escolher um canal, a interface também mostra o `service_id`, a frequência,
+os PIDs, codecs, modulação, largura de banda, intervalo de guarda, modo de
+transmissão, code rates HP/LP e inversão encontrados na varredura. Durante a
+captura, a página exibe `GERANDO AMOSTRA`; a reprodução começa somente quando
+a playlist VOD é finalizada.
 
-Se a imagem usar outro arquivo de frequências, altere apenas:
+As tabelas regionais disponíveis e a região selecionada podem ser consultadas
+diretamente:
+
+```sh
+wget -qO- http://127.0.0.1/cgi-bin/tv-regions
+cat /var/lib/jupiter/tv/selected-region
+```
+
+O arquivo `scan_input_file` continua sendo o fallback inicial. Se a imagem usar
+outro diretório de tabelas, altere:
 
 ```json
 {
-  "scan_input_file": "/usr/share/dvbv5/isdb-t/br-sp-SaoPaulo"
+  "scan_input_file": "/usr/share/dvb/isdb-t/br-pr-Curitiba",
+  "scan_table_dir": "/usr/share/dvb/isdb-t",
+  "region_state_file": "/var/lib/jupiter/tv/selected-region"
 }
 ```
 
-Os endpoints locais são `tv-status`, `tv-channels`, `tv-scan`, `tv-select` e
-`tv-stop`, todos servidos pelo mesmo BusyBox `httpd` da telemetria.
+Os endpoints locais são `tv-status`, `tv-regions`, `tv-channels`, `tv-scan`,
+`tv-select` e `tv-stop`, todos servidos pelo mesmo BusyBox `httpd` da
+telemetria. A varredura aceita a região escolhida por
+`POST /cgi-bin/tv-scan?region_id=sp-SaoPaulo`.

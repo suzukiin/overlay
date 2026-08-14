@@ -1,0 +1,38 @@
+#!/bin/sh
+
+COMMON="${JUPITER_TV_COMMON:-/usr/bin/jupiter-tv-common}"
+if [ ! -f "$COMMON" ]; then
+    COMMON="$(dirname "$0")/../../usr/bin/jupiter-tv-common"
+fi
+. "$COMMON"
+
+printf 'Content-Type: application/json\r\n\r\n'
+
+tv_ensure_dirs
+
+selected_region="$(tv_region_id_from_path "$TV_SCAN_INPUT")"
+first=true
+
+printf '{"status":"Success","data":{"selected_region_id":"%s","regions":[' \
+    "$(tv_json_escape "$selected_region")"
+
+for region_path in "$TV_SCAN_TABLE_DIR"/br-*; do
+    [ -f "$region_path" ] || continue
+    region_base="${region_path##*/}"
+    region_id="${region_base#br-}"
+    case "$region_id" in
+        ''|*[!A-Za-z0-9_-]*) continue ;;
+    esac
+    region_label="$(tv_region_label "$region_id")"
+
+    if [ "$first" = true ]; then
+        first=false
+    else
+        printf ','
+    fi
+    printf '{"id":"%s","label":"%s","file":"%s"}' \
+        "$(tv_json_escape "$region_id")" "$(tv_json_escape "$region_label")" \
+        "$(tv_json_escape "$region_path")"
+done
+
+printf ']}}\n'

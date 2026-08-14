@@ -301,6 +301,13 @@
                                 <span class="tv-tuner-indicator" id="tv-tuner-indicator">TUNER --</span>
                             </div>
 
+                            <label class="form-label text-muted small text-uppercase mt-3" for="tv-region-select">
+                                Região da varredura
+                            </label>
+                            <select class="form-select bg-dark border-secondary text-light" id="tv-region-select" disabled>
+                                <option value="">Carregando tabelas regionais...</option>
+                            </select>
+
                             <label class="form-label text-muted small text-uppercase mt-3" for="tv-channel-select">
                                 Canal encontrado
                             </label>
@@ -321,6 +328,7 @@
                             </div>
 
                             <div class="tv-details mt-3">
+                                <div><span class="text-muted">Região</span><span id="tv-region-state">--</span></div>
                                 <div><span class="text-muted">Varredura</span><span id="tv-scan-state">--</span></div>
                                 <div><span class="text-muted">Transmissão</span><span id="tv-stream-state">--</span></div>
                                 <div><span class="text-muted">Serviços</span><span id="tv-channel-count">0</span></div>
@@ -330,6 +338,13 @@
                                 <div><span class="text-muted">Frequência</span><span id="tv-meta-frequency">--</span></div>
                                 <div><span class="text-muted">Vídeo PID</span><span id="tv-meta-video-pid">--</span></div>
                                 <div><span class="text-muted">Áudio PID</span><span id="tv-meta-audio-pid">--</span></div>
+                                <div><span class="text-muted">Vídeo</span><span id="tv-meta-video-codec">--</span></div>
+                                <div><span class="text-muted">Áudio</span><span id="tv-meta-audio-codec">--</span></div>
+                                <div><span class="text-muted">Modulação</span><span id="tv-meta-modulation">--</span></div>
+                                <div><span class="text-muted">Banda</span><span id="tv-meta-bandwidth">--</span></div>
+                                <div><span class="text-muted">Guarda / modo</span><span id="tv-meta-guard-mode">--</span></div>
+                                <div><span class="text-muted">Code rate HP/LP</span><span id="tv-meta-code-rate">--</span></div>
+                                <div><span class="text-muted">Inversão</span><span id="tv-meta-inversion">--</span></div>
                             </div>
                             <div class="tv-error text-danger font-mono mt-3" id="tv-error" hidden></div>
                         </div>

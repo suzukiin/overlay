@@ -12,6 +12,7 @@ TV_SCHEMA_VERSION=1
 TV_DEFAULT_RUN_DIR="${JUPITER_RUN}/tv"
 TV_DEFAULT_STATE_DIR="/var/lib/jupiter/tv"
 TV_DEFAULT_WEB_ROOT="/www/public/tv"
+TV_DEFAULT_SCAN_TABLE_DIR="/usr/share/dvb/isdb-t"
 
 tv_json_string() {
     file="$1"
@@ -61,11 +62,13 @@ tv_load_config() {
     TV_FRONTEND="$(tv_json_number "$JUPITER_TV_CONFIG" frontend)"
     TV_DVB_ROOT="$(tv_json_string "$JUPITER_TV_CONFIG" dvb_root)"
     TV_SCAN_INPUT="$(tv_json_string "$JUPITER_TV_CONFIG" scan_input_file)"
+    TV_SCAN_TABLE_DIR="$(tv_json_string "$JUPITER_TV_CONFIG" scan_table_dir)"
     TV_CHANNELS_FILE="$(tv_json_string "$JUPITER_TV_CONFIG" channels_file)"
     TV_CHANNELS_TSV="$(tv_json_string "$JUPITER_TV_CONFIG" channels_tsv)"
     TV_CHANNELS_JSON="$(tv_json_string "$JUPITER_TV_CONFIG" channels_json)"
     TV_STATE_FILE="$(tv_json_string "$JUPITER_TV_CONFIG" state_file)"
     TV_RUN_DIR="$(tv_json_string "$JUPITER_TV_CONFIG" run_dir)"
+    TV_REGION_STATE_FILE="$(tv_json_string "$JUPITER_TV_CONFIG" region_state_file)"
     TV_WEB_ROOT="$(tv_json_string "$JUPITER_TV_CONFIG" web_root)"
     TV_SEGMENT_SECONDS="$(tv_json_number "$JUPITER_TV_CONFIG" segment_seconds)"
     TV_PLAYLIST_SIZE="$(tv_json_number "$JUPITER_TV_CONFIG" playlist_size)"
@@ -79,12 +82,14 @@ tv_load_config() {
     [ -n "$TV_ADAPTER" ] || TV_ADAPTER=0
     [ -n "$TV_FRONTEND" ] || TV_FRONTEND=0
     [ -n "$TV_DVB_ROOT" ] || TV_DVB_ROOT=/dev/dvb
-    [ -n "$TV_SCAN_INPUT" ] || TV_SCAN_INPUT=/usr/share/dvbv5/isdb-t/br-Brazil
+    [ -n "$TV_SCAN_INPUT" ] || TV_SCAN_INPUT=/usr/share/dvb/isdb-t/br-Brazil
+    [ -n "$TV_SCAN_TABLE_DIR" ] || TV_SCAN_TABLE_DIR="$TV_DEFAULT_SCAN_TABLE_DIR"
     [ -n "$TV_CHANNELS_FILE" ] || TV_CHANNELS_FILE="$TV_DEFAULT_STATE_DIR/channels.conf"
     [ -n "$TV_CHANNELS_TSV" ] || TV_CHANNELS_TSV="$TV_DEFAULT_STATE_DIR/channels.tsv"
     [ -n "$TV_CHANNELS_JSON" ] || TV_CHANNELS_JSON="$TV_DEFAULT_STATE_DIR/channels.json"
     [ -n "$TV_STATE_FILE" ] || TV_STATE_FILE="$TV_DEFAULT_STATE_DIR/state.json"
     [ -n "$TV_RUN_DIR" ] || TV_RUN_DIR="$TV_DEFAULT_RUN_DIR"
+    [ -n "$TV_REGION_STATE_FILE" ] || TV_REGION_STATE_FILE="$TV_DEFAULT_STATE_DIR/selected-region"
     [ -n "$TV_WEB_ROOT" ] || TV_WEB_ROOT="$TV_DEFAULT_WEB_ROOT"
     [ -n "$TV_SEGMENT_SECONDS" ] || TV_SEGMENT_SECONDS=2
     [ -n "$TV_PLAYLIST_SIZE" ] || TV_PLAYLIST_SIZE=6
@@ -93,6 +98,11 @@ tv_load_config() {
     [ -n "$TV_SAMPLE_HEIGHT" ] || TV_SAMPLE_HEIGHT=360
     [ -n "$TV_SAMPLE_VIDEO_BITRATE" ] || TV_SAMPLE_VIDEO_BITRATE=450k
     [ -n "$TV_SAMPLE_AUDIO_BITRATE" ] || TV_SAMPLE_AUDIO_BITRATE=64k
+
+    if [ -r "$TV_REGION_STATE_FILE" ]; then
+        selected_scan_input="$(sed -n '1p' "$TV_REGION_STATE_FILE" 2>/dev/null)"
+        [ -r "$selected_scan_input" ] && TV_SCAN_INPUT="$selected_scan_input"
+    fi
 
     TV_CONTROLLER_PID="$TV_RUN_DIR/controller.pid"
     TV_STREAM_PID="$TV_RUN_DIR/stream.pid"
@@ -105,7 +115,8 @@ tv_load_config() {
 tv_ensure_dirs() {
     tv_load_config
     mkdir -p "$TV_RUN_DIR" "$(dirname "$TV_STATE_FILE")" "$(dirname "$TV_CHANNELS_FILE")" \
-        "$(dirname "$TV_CHANNELS_TSV")" "$(dirname "$TV_CHANNELS_JSON")" "$TV_WEB_ROOT"
+        "$(dirname "$TV_CHANNELS_TSV")" "$(dirname "$TV_CHANNELS_JSON")" \
+        "$(dirname "$TV_REGION_STATE_FILE")" "$TV_WEB_ROOT"
 
     if [ ! -r "$TV_STATE_FILE" ]; then
         tv_write_state "idle" "idle" "" "" "" "" "" "" ""
@@ -114,6 +125,39 @@ tv_ensure_dirs() {
 
 tv_json_escape() {
     printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/	/ /g; s/\r//g; s/[[:cntrl:]]//g'
+}
+
+tv_region_path() {
+    region_id="$1"
+    case "$region_id" in
+        ''|*[!A-Za-z0-9_-]*) return 1 ;;
+    esac
+
+    region_path="$TV_SCAN_TABLE_DIR/br-$region_id"
+    [ -r "$region_path" ] || return 1
+    printf '%s\n' "$region_path"
+}
+
+tv_region_id_from_path() {
+    region_path="$1"
+    region_base="${region_path##*/}"
+    case "$region_base" in
+        br-*) printf '%s\n' "${region_base#br-}" ;;
+        *) printf '\n' ;;
+    esac
+}
+
+tv_region_label() {
+    region_id="$1"
+    region_state="${region_id%%-*}"
+    region_place="$region_id"
+    case "$region_id" in
+        *-*) region_place="${region_id#*-}" ;;
+    esac
+
+    region_state="$(printf '%s' "$region_state" | tr '[:lower:]' '[:upper:]')"
+    region_place="$(printf '%s' "$region_place" | sed 's/[-_]/ /g')"
+    printf '%s - %s\n' "$region_state" "$region_place"
 }
 
 tv_state_string() {

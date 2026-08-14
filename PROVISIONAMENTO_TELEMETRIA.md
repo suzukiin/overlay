@@ -459,7 +459,9 @@ Confira a configuração em `/etc/jupiter/tv.json`:
   "enabled": true,
   "adapter": 0,
   "frontend": 0,
-  "scan_input_file": "/usr/share/dvbv5/isdb-t/br-Brazil",
+  "scan_input_file": "/usr/share/dvb/isdb-t/br-pr-Curitiba",
+  "scan_table_dir": "/usr/share/dvb/isdb-t",
+  "region_state_file": "/var/lib/jupiter/tv/selected-region",
   "segment_seconds": 2,
   "playlist_size": 6,
   "sample_seconds": 15,
@@ -471,14 +473,22 @@ Confira a configuração em `/etc/jupiter/tv.json`:
 ```
 
 O arquivo inicial deve conter as frequências ISDB-T da região. O pacote
-`dtv-scan-tables` normalmente fornece arquivos como `br-Brazil` e variantes
-municipais. Depois de conectar a antena e o dongle:
+`dtv-scan-tables` instala as tabelas em `/usr/share/dvb/isdb-t`, normalmente
+com nomes como `br-pr-Curitiba`, `br-sp-SaoPaulo` e outras variantes
+municipais. A página lista somente os arquivos `br-*` realmente presentes na
+imagem. A região escolhida fica persistida em
+`/var/lib/jupiter/tv/selected-region`, permitindo trocar de local sem editar o
+JSON a cada viagem.
+
+Depois de conectar a antena e o dongle:
 
 ```sh
 ls -l /dev/dvb/adapter0
+find /usr/share/dvb/isdb-t -maxdepth 1 -type f -name 'br-*' | sort | head
 jupiter-services restart
 curl http://127.0.0.1/cgi-bin/tv-status
-curl -X POST http://127.0.0.1/cgi-bin/tv-scan
+curl http://127.0.0.1/cgi-bin/tv-regions
+curl -X POST 'http://127.0.0.1/cgi-bin/tv-scan?region_id=pr-Curitiba'
 cat /var/lib/jupiter/tv/channels.json
 ```
 
@@ -498,9 +508,12 @@ captura anterior é encerrada e uma nova sessão HLS VOD é criada em
 são removidos ao iniciar outra amostra ou pressionar `Parar`.
 
 Ao selecionar um canal na página, os metadados encontrados na varredura são
-exibidos: `SERVICE_ID`, frequência e PIDs de vídeo e áudio. Para economizar
-dados, a amostra é redimensionada e recodificada para H.264/AAC conforme os
-parâmetros acima; não há transmissão contínua nem gravação permanente.
+exibidos: `SERVICE_ID`, frequência, PIDs, codecs, modulação, largura de banda,
+intervalo de guarda, modo de transmissão, code rates HP/LP e inversão. Esses
+campos são atualizados após uma nova varredura; canais de um `channels.json`
+antigo podem não possuir os campos técnicos adicionais. Para economizar dados,
+a amostra é redimensionada e recodificada para H.264/AAC conforme os parâmetros
+acima; não há transmissão contínua nem gravação permanente.
 
 Diagnóstico rápido:
 
